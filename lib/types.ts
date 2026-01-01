@@ -1,4 +1,7 @@
-import { UserRole } from "./constants";
+import { UserRole as UserRoleType } from "./constants";
+
+// Re-export UserRole type
+export type UserRole = UserRoleType;
 
 // User Types
 export interface User {
