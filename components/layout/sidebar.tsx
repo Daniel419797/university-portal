@@ -21,6 +21,7 @@ import {
   FileCheck,
   Building2,
   UserCheck,
+  CreditCard,
 } from "lucide-react";
 import { UserRole } from "@/lib/types";
 
@@ -43,6 +44,7 @@ const studentNavItems: NavItem[] = [
   { title: "Quizzes", href: "/student/quizzes", icon: ClipboardList },
   { title: "Results", href: "/student/results", icon: Trophy },
   { title: "Payments", href: "/student/payments", icon: DollarSign },
+  { title: "ID Card", href: "/student/id-card", icon: CreditCard },
   { title: "Hostel", href: "/student/hostel", icon: HomeIcon },
   { title: "Scholarships", href: "/student/scholarships", icon: GraduationCap },
   { title: "Messages", href: "/student/messages", icon: MessageSquare },

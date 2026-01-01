@@ -4,6 +4,14 @@ import { Bell, Menu, Moon, Sun, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { useNotificationStore } from "@/store/notification-store";
@@ -20,7 +28,6 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const { unreadCount } = useNotificationStore();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -109,53 +116,53 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
 
         {/* Profile */}
-        <div className="relative">
-          <button
-            onClick={() => setShowProfile(!showProfile)}
-            className="flex items-center gap-2 rounded-lg p-2 hover:bg-accent"
-          >
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.avatar} alt={user?.firstName} />
-              <AvatarFallback>
-                {user ? getInitials(`${user.firstName} ${user.lastName}`) : "U"}
-              </AvatarFallback>
-            </Avatar>
-            <span className="hidden md:block text-sm font-medium">
-              {user?.firstName} {user?.lastName}
-            </span>
-          </button>
-
-          {/* Profile Dropdown */}
-          {showProfile && (
-            <div className="absolute right-0 top-12 w-56 rounded-lg border border-border bg-card p-2 shadow-lg">
-              <div className="mb-2 border-b border-border pb-2">
-                <p className="font-medium">{user?.firstName} {user?.lastName}</p>
-                <p className="text-sm text-muted-foreground">{user?.email}</p>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-2 rounded-lg p-2 hover:bg-accent">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.avatar} alt={user?.firstName} />
+                <AvatarFallback>
+                  {user ? getInitials(`${user.firstName} ${user.lastName}`) : "U"}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden md:block text-sm font-medium">
+                {user?.firstName} {user?.lastName}
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div>
+                <p className="font-medium">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-sm font-normal text-muted-foreground">
+                  {user?.email}
+                </p>
                 {user?.studentId && (
-                  <p className="text-sm text-muted-foreground">{user.studentId}</p>
+                  <p className="text-sm font-normal text-muted-foreground">
+                    {user.studentId}
+                  </p>
                 )}
               </div>
-              <Link
-                href="/settings/profile"
-                className="flex items-center gap-2 rounded px-2 py-2 text-sm hover:bg-accent"
-                onClick={() => setShowProfile(false)}
-              >
-                <User className="h-4 w-4" />
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/settings/profile" className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
                 Profile Settings
               </Link>
-              <button
-                onClick={() => {
-                  logout();
-                  setShowProfile(false);
-                }}
-                className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-destructive hover:bg-accent"
-              >
-                <LogOut className="h-4 w-4" />
-                Logout
-              </button>
-            </div>
-          )}
-        </div>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={logout}
+              className="cursor-pointer text-destructive focus:text-destructive"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

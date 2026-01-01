@@ -1,0 +1,301 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Download, Users, TrendingUp, Award } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+export default function HODStudentsPage() {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLevel, setSelectedLevel] = useState("all");
+
+  const students = [
+    {
+      id: "1",
+      name: "John Doe",
+      matricNumber: "STU/2023/001",
+      level: "400",
+      cgpa: 4.85,
+      status: "active",
+      email: "john.doe@university.edu",
+      phone: "+234 123 456 7890",
+    },
+    {
+      id: "2",
+      name: "Jane Smith",
+      matricNumber: "STU/2023/002",
+      level: "400",
+      cgpa: 4.95,
+      status: "active",
+      email: "jane.smith@university.edu",
+      phone: "+234 123 456 7891",
+    },
+    {
+      id: "3",
+      name: "Michael Johnson",
+      matricNumber: "STU/2023/005",
+      level: "300",
+      cgpa: 4.72,
+      status: "active",
+      email: "michael.johnson@university.edu",
+      phone: "+234 123 456 7892",
+    },
+    {
+      id: "4",
+      name: "Sarah Williams",
+      matricNumber: "STU/2023/008",
+      level: "400",
+      cgpa: 4.88,
+      status: "active",
+      email: "sarah.williams@university.edu",
+      phone: "+234 123 456 7893",
+    },
+    {
+      id: "5",
+      name: "David Brown",
+      matricNumber: "STU/2024/010",
+      level: "200",
+      cgpa: 4.65,
+      status: "active",
+      email: "david.brown@university.edu",
+      phone: "+234 123 456 7894",
+    },
+    {
+      id: "6",
+      name: "Emily Davis",
+      matricNumber: "STU/2024/015",
+      level: "200",
+      cgpa: 4.78,
+      status: "active",
+      email: "emily.davis@university.edu",
+      phone: "+234 123 456 7895",
+    },
+  ];
+
+  const filteredStudents = students.filter(
+    (student) =>
+      (selectedLevel === "all" || student.level === selectedLevel) &&
+      (searchQuery === "" ||
+        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.matricNumber.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const studentsByLevel = {
+    "100": students.filter((s) => s.level === "100").length,
+    "200": students.filter((s) => s.level === "200").length,
+    "300": students.filter((s) => s.level === "300").length,
+    "400": students.filter((s) => s.level === "400").length,
+  };
+
+  const averageCGPA = (
+    students.reduce((sum, student) => sum + student.cgpa, 0) / students.length
+  ).toFixed(2);
+
+  const getCGPAColor = (cgpa: number) => {
+    if (cgpa >= 4.5) return "text-green-600";
+    if (cgpa >= 3.5) return "text-blue-600";
+    if (cgpa >= 2.5) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const getCGPAClass = (cgpa: number) => {
+    if (cgpa >= 4.5) return "First Class";
+    if (cgpa >= 3.5) return "Second Class Upper";
+    if (cgpa >= 2.5) return "Second Class Lower";
+    if (cgpa >= 1.5) return "Third Class";
+    return "Pass";
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Department Students</h1>
+            <p className="text-muted-foreground">Computer Science Department</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Download className="mr-2 h-4 w-4" />
+              Export List
+            </Button>
+            <Button variant="outline" onClick={() => router.back()}>
+              Back
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription>Total Students</CardDescription>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{students.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription>Average CGPA</CardDescription>
+              <Award className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{averageCGPA}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription>First Class</CardDescription>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {students.filter((s) => s.cgpa >= 4.5).length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardDescription>Active Status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {students.filter((s) => s.status === "active").length}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Students by Level */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Students by Level</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-4">
+              {Object.entries(studentsByLevel).map(([level, count]) => (
+                <div key={level} className="p-4 border rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Level {level}</div>
+                  <div className="text-2xl font-bold">{count} students</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Search and Filter */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or matric number..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <select
+                className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={selectedLevel}
+                onChange={(e) => setSelectedLevel(e.target.value)}
+              >
+                <option value="all">All Levels</option>
+                <option value="100">Level 100</option>
+                <option value="200">Level 200</option>
+                <option value="300">Level 300</option>
+                <option value="400">Level 400</option>
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Students Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Students List</CardTitle>
+            <CardDescription>
+              Showing {filteredStudents.length} of {students.length} students
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Matric Number</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Level</TableHead>
+                  <TableHead>CGPA</TableHead>
+                  <TableHead>Classification</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredStudents.map((student) => (
+                  <TableRow key={student.id}>
+                    <TableCell className="font-mono font-semibold">
+                      {student.matricNumber}
+                    </TableCell>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Level {student.level}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`font-bold ${getCGPAColor(student.cgpa)}`}>
+                        {student.cgpa.toFixed(2)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          student.cgpa >= 4.5
+                            ? "bg-green-500"
+                            : student.cgpa >= 3.5
+                            ? "bg-blue-500"
+                            : "bg-yellow-500"
+                        }
+                      >
+                        {getCGPAClass(student.cgpa)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-xs space-y-1">
+                        <div>{student.email}</div>
+                        <div className="text-muted-foreground">{student.phone}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={student.status === "active" ? "default" : "secondary"}>
+                        {student.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/hod/students/${student.id}`}>
+                          View Profile
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+}

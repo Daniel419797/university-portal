@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 import { mockCourses, mockAssignments } from "@/lib/mock-data";
@@ -93,7 +94,7 @@ export default function StudentDashboardPage() {
             <CardDescription>Common tasks and shortcuts</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <Button variant="outline" className="w-full justify-start" asChild>
                 <Link href="/student/timetable">
                   <Calendar className="mr-2 h-4 w-4" />
@@ -110,6 +111,12 @@ export default function StudentDashboardPage() {
                 <Link href="/student/payments/make-payment">
                   <DollarSign className="mr-2 h-4 w-4" />
                   Make Payment
+                </Link>
+              </Button>
+              <Button variant="outline" className="w-full justify-start" asChild>
+                <Link href="/student/id-card">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  My ID Card
                 </Link>
               </Button>
             </div>
