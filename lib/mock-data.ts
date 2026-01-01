@@ -1,4 +1,4 @@
-import { Course, User, Assignment, Payment, HostelApplication, Result, Notification, Message, Quiz, Scholarship } from "@/lib/types";
+import { Course, User, Assignment, Payment, HostelApplication, Result, Message, Quiz, Scholarship } from "@/lib/types";
 import { USER_ROLES } from "@/lib/constants";
 
 // Mock Users

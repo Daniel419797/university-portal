@@ -1,7 +1,7 @@
 "use client";
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,7 +13,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
-import { mockCourses, mockAssignments } from "@/lib/mock-data";
+import { mockCourses } from "@/lib/mock-data";
 
 export default function LecturerDashboardPage() {
   const stats = [

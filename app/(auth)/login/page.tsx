@@ -53,7 +53,7 @@ export default function LoginPage() {
       };
       
       router.push(roleRoutes[data.role]);
-    } catch (err) {
+    } catch {
       setError("Invalid credentials. Please try again.");
     }
   };
@@ -136,7 +136,7 @@ export default function LoginPage() {
 
             {/* Register Link */}
             <p className="text-center text-sm text-muted-foreground">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/register" className="text-primary hover:underline">
                 Register as Student
               </Link>

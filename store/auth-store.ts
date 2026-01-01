@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { User } from "@/lib/types";
+import { User, UserRole } from "@/lib/types";
 
 interface AuthState {
   user: User | null;
@@ -40,7 +40,7 @@ export const useAuthStore = create<AuthState>()(
           email,
           firstName: "John",
           lastName: "Doe",
-          role: role as any,
+          role: role as UserRole,
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
           studentId: role === "student" ? "STU/2023/001" : undefined,
           department: "Computer Science",

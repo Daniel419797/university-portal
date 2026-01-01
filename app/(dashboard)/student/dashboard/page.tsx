@@ -15,8 +15,8 @@ import {
   Clock,
 } from "lucide-react";
 import Link from "next/link";
-import { mockCourses, mockAssignments, mockPayments, mockResults } from "@/lib/mock-data";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { mockCourses, mockAssignments } from "@/lib/mock-data";
+import { formatDate } from "@/lib/utils";
 
 export default function StudentDashboardPage() {
   // Mock stats
