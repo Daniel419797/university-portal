@@ -7,71 +7,80 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, Users, Award, Edit, Trash2, BarChart3, FileText } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService } from "@/lib/services/lecturerService";
+import { Quiz } from "@/lib/types";
 
 export default function QuizManagementPage() {
   const params = useParams();
   const router = useRouter();
-  const quizId = params?.id;
+  const quizId = params?.id as string;
   const { toast } = useToast();
 
-  const quiz = {
-    id: quizId,
-    title: "Mid-Semester Quiz",
-    courseCode: "CSC 401",
-    courseName: "Artificial Intelligence",
-    description: "This quiz covers topics from Chapters 1-4 including search algorithms, knowledge representation, machine learning fundamentals, and neural networks.",
-    status: "active", // active, draft, closed
-    duration: 60,
-    totalMarks: 20,
-    passingMarks: 12,
-    questionsCount: 20,
-    startDate: "2026-01-10T09:00:00",
-    endDate: "2026-01-15T23:59:00",
-    attemptsAllowed: 1,
-    shuffleQuestions: true,
-    showResults: true,
-    createdAt: "2026-01-05T10:00:00",
-    totalStudents: 42,
-    attemptedCount: 35,
-    completedCount: 32,
-    averageScore: 16.5,
-    highestScore: 19,
-    lowestScore: 8,
-  };
+  const { data: quiz, isLoading, execute } = useApi<Quiz>();
+
+  useEffect(() => {
+    if (quizId) {
+      execute(() => lecturerService.getQuizDetails(quizId), {
+        errorMessage: "Failed to load quiz details"
+      });
+    }
+  }, [execute, quizId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading quiz...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Quiz not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const stats = [
     {
       label: "Total Students",
-      value: quiz.totalStudents,
+      value: quiz.totalStudents || 0,
       icon: Users,
       color: "text-blue-600",
     },
     {
       label: "Attempted",
-      value: quiz.attemptedCount,
+      value: quiz.attemptedCount || 0,
       icon: FileText,
       color: "text-green-600",
     },
     {
       label: "Completed",
-      value: quiz.completedCount,
+      value: quiz.completedCount || 0,
       icon: Award,
       color: "text-purple-600",
     },
     {
       label: "Average Score",
-      value: `${quiz.averageScore}/${quiz.totalMarks}`,
+      value: `${quiz.averageScore || 0}/${quiz.totalMarks}`,
       icon: BarChart3,
       color: "text-yellow-600",
     },
   ];
 
-  const questionTypes = [
-    { type: "Multiple Choice", count: 15 },
-    { type: "True/False", count: 5 },
-  ];
+  const questionTypes = quiz.questionTypes || [];
 
   const handleDelete = () => {
     const confirmed = confirm("Are you sure you want to delete this quiz? This action cannot be undone.");
@@ -95,8 +104,8 @@ export default function QuizManagementPage() {
     });
   };
 
-  const participationRate = ((quiz.attemptedCount / quiz.totalStudents) * 100).toFixed(0);
-  const completionRate = ((quiz.completedCount / quiz.attemptedCount) * 100).toFixed(0);
+  const participationRate = quiz.totalStudents ? ((quiz.attemptedCount! / quiz.totalStudents) * 100).toFixed(0) : "0";
+  const completionRate = quiz.attemptedCount ? ((quiz.completedCount! / quiz.attemptedCount) * 100).toFixed(0) : "0";
 
   return (
     <DashboardLayout>
@@ -130,7 +139,7 @@ export default function QuizManagementPage() {
                   {quiz.status === "active" ? "Active" : quiz.status === "closed" ? "Closed" : "Draft"}
                 </Badge>
                 <div className="text-sm text-muted-foreground">
-                  Created on {new Date(quiz.createdAt).toLocaleDateString()}
+                  Created on {quiz.createdAt ? new Date(quiz.createdAt).toLocaleDateString() : 'N/A'}
                 </div>
               </div>
               <div className="flex gap-2">
@@ -157,7 +166,7 @@ export default function QuizManagementPage() {
                 {stat.label === "Attempted" && (
                   <p className="text-xs text-muted-foreground mt-1">{participationRate}% participation</p>
                 )}
-                {stat.label === "Completed" && quiz.attemptedCount > 0 && (
+                {stat.label === "Completed" && quiz.attemptedCount && quiz.attemptedCount > 0 && (
                   <p className="text-xs text-muted-foreground mt-1">{completionRate}% completion rate</p>
                 )}
               </CardContent>
@@ -225,16 +234,16 @@ export default function QuizManagementPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Highest Score:</span>
-                    <span className="font-medium text-green-600">{quiz.highestScore}</span>
+                    <span className="font-medium text-green-600">{quiz.highestScore || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Lowest Score:</span>
-                    <span className="font-medium text-red-600">{quiz.lowestScore}</span>
+                    <span className="font-medium text-red-600">{quiz.lowestScore || 'N/A'}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Pass Rate:</span>
                     <span className="font-medium">
-                      {((quiz.completedCount * 0.9 / quiz.completedCount) * 100).toFixed(0)}%
+                      {quiz.completedCount ? ((quiz.completedCount * 0.9 / quiz.completedCount) * 100).toFixed(0) : '0'}%
                     </span>
                   </div>
                 </CardContent>
@@ -333,19 +342,19 @@ export default function QuizManagementPage() {
                   <div className="grid gap-4 md:grid-cols-3 text-center">
                     <div className="p-4 border rounded-lg">
                       <div className="text-2xl font-bold text-green-600">
-                        {Math.round(quiz.completedCount * 0.9)}
+                        {quiz.completedCount ? Math.round(quiz.completedCount * 0.9) : 0}
                       </div>
                       <p className="text-sm text-muted-foreground">Passed</p>
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="text-2xl font-bold text-red-600">
-                        {Math.round(quiz.completedCount * 0.1)}
+                        {quiz.completedCount ? Math.round(quiz.completedCount * 0.1) : 0}
                       </div>
                       <p className="text-sm text-muted-foreground">Failed</p>
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="text-2xl font-bold text-yellow-600">
-                        {quiz.attemptedCount - quiz.completedCount}
+                        {(quiz.attemptedCount || 0) - (quiz.completedCount || 0)}
                       </div>
                       <p className="text-sm text-muted-foreground">In Progress</p>
                     </div>

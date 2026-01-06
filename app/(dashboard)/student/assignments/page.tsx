@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,15 +8,25 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { FileText, Clock, AlertCircle, CheckCircle, Search, Upload } from "lucide-react";
 import Link from "next/link";
-import { mockAssignments } from "@/lib/mock-data";
 import { formatDate } from "@/lib/utils";
-import { useState } from "react";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services";
+import { Assignment } from "@/lib/types";
 
 export default function StudentAssignmentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const { data: assignments, isLoading, execute } = useApi<Assignment[]>();
+
+  useEffect(() => {
+    execute(() => studentService.getAssignments(), {
+      errorMessage: "Failed to load assignments",
+    });
+  }, [execute]);
   
-  const filteredAssignments = mockAssignments.filter((assignment) => {
+  const assignmentsList = assignments || [];
+  
+  const filteredAssignments = assignmentsList.filter((assignment) => {
     const matchesSearch =
       assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       assignment.courseName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -40,6 +51,40 @@ export default function StudentAssignmentsPage() {
     return <Clock className="h-4 w-4" />;
   };
 
+  // Calculate stats
+  const stats = {
+    total: assignmentsList.length,
+    pending: assignmentsList.filter(a => a.status === "pending").length,
+    submitted: assignmentsList.filter(a => a.status === "submitted").length,
+    graded: assignmentsList.filter(a => a.status === "graded").length,
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Assignments</h1>
+            <p className="text-muted-foreground">Loading assignments...</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="h-4 bg-muted animate-pulse rounded" />
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-muted animate-pulse rounded" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -58,7 +103,7 @@ export default function StudentAssignmentsPage() {
               <CardTitle className="text-sm font-medium">Total</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockAssignments.length}</div>
+              <div className="text-2xl font-bold">{stats.total}</div>
             </CardContent>
           </Card>
           <Card>
@@ -66,8 +111,8 @@ export default function StudentAssignmentsPage() {
               <CardTitle className="text-sm font-medium">Pending</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {mockAssignments.filter((a) => a.status === "pending").length}
+              <div className="text-2xl font-bold text-orange-500">
+                {stats.pending}
               </div>
             </CardContent>
           </Card>
@@ -76,18 +121,18 @@ export default function StudentAssignmentsPage() {
               <CardTitle className="text-sm font-medium">Submitted</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {mockAssignments.filter((a) => a.status === "submitted").length}
+              <div className="text-2xl font-bold text-blue-500">
+                {stats.submitted}
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+              <CardTitle className="text-sm font-medium">Graded</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">
-                {mockAssignments.filter((a) => a.status === "overdue").length}
+              <div className="text-2xl font-bold text-green-500">
+                {stats.graded}
               </div>
             </CardContent>
           </Card>

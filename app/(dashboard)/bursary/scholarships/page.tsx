@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,81 +8,54 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { GraduationCap, Users, DollarSign, TrendingUp, CheckCircle } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { bursaryService } from "@/lib/services/hodBursaryService";
+import { Scholarship } from "@/lib/types";
 
 export default function BursaryScholarshipsPage() {
+  const { data: applications, isLoading: applicationsLoading, execute: executeApplications } = useApi<Array<{ id: string; studentId: string; studentName: string; scholarshipName: string; amountRequested: number; status: string; appliedAt: string }>>();
+  const { data: programs, isLoading: programsLoading, execute: executePrograms } = useApi<Scholarship[]>();
+
+  useEffect(() => {
+    executeApplications(() => bursaryService.getScholarships(), {
+      errorMessage: "Failed to load scholarship applications"
+    });
+    executePrograms(() => bursaryService.getScholarshipPrograms(), {
+      errorMessage: "Failed to load scholarship programs"
+    });
+  }, [executeApplications, executePrograms]);
+
+  if (applicationsLoading || programsLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading scholarships...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const pendingCount = applications?.filter((a) => a.status === "pending").length || 0;
+  const approvedCount = applications?.filter((a) => a.status === "approved").length || 0;
+  
   const stats = [
     {
-      title: "Active Scholarships",
-      value: "12",
+      title: "Total Applications",
+      value: applications?.length.toString() || "0",
       icon: GraduationCap,
     },
     {
-      title: "Total Recipients",
-      value: "245",
-      icon: Users,
-    },
-    {
-      title: "Total Disbursed",
-      value: "₦18.5M",
-      icon: DollarSign,
-    },
-    {
-      title: "Pending Applications",
-      value: "78",
+      title: "Pending Review",
+      value: pendingCount.toString(),
       icon: TrendingUp,
     },
-  ];
-
-  const scholarships = [
     {
-      id: "1",
-      name: "Merit Scholarship",
-      amount: 100000,
-      recipients: 50,
-      budget: 5000000,
-      disbursed: 5000000,
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Need-Based Scholarship",
-      amount: 75000,
-      recipients: 100,
-      budget: 7500000,
-      disbursed: 7500000,
-      status: "active",
-    },
-    {
-      id: "3",
-      name: "Sports Excellence Award",
-      amount: 50000,
-      recipients: 20,
-      budget: 1000000,
-      disbursed: 1000000,
-      status: "active",
-    },
-  ];
-
-  const applications = [
-    {
-      id: "1",
-      studentName: "John Doe",
-      matricNumber: "STU/2023/001",
-      scholarshipName: "Merit Scholarship",
-      amount: 100000,
-      cgpa: 4.85,
-      status: "pending",
-      appliedAt: "2026-01-05",
-    },
-    {
-      id: "2",
-      studentName: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      scholarshipName: "Need-Based Scholarship",
-      amount: 75000,
-      cgpa: 4.2,
-      status: "approved",
-      appliedAt: "2026-01-03",
+      title: "Approved",
+      value: approvedCount.toString(),
+      icon: CheckCircle,
     },
   ];
 
@@ -119,7 +93,7 @@ export default function BursaryScholarshipsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {scholarships.map((scholarship) => (
+              {programs?.map((scholarship) => (
                 <Card key={scholarship.id}>
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between mb-4">
@@ -130,7 +104,7 @@ export default function BursaryScholarshipsPage() {
                         </p>
                       </div>
                       <Badge
-                        variant={scholarship.status === "active" ? "default" : "secondary"}
+                        variant={scholarship.status === "open" ? "default" : "secondary"}
                       >
                         {scholarship.status}
                       </Badge>
@@ -138,18 +112,18 @@ export default function BursaryScholarshipsPage() {
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground">Recipients</p>
-                        <p className="font-medium">{scholarship.recipients} students</p>
+                        <p className="font-medium">{scholarship.recipients || 0} students</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Budget</p>
                         <p className="font-medium">
-                          ₦{(scholarship.budget / 1000000).toFixed(1)}M
+                          ₦{((scholarship.budget || 0) / 1000000).toFixed(1)}M
                         </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Disbursed</p>
                         <p className="font-medium">
-                          ₦{(scholarship.disbursed / 1000000).toFixed(1)}M
+                          ₦{((scholarship.disbursed || 0) / 1000000).toFixed(1)}M
                         </p>
                       </div>
                     </div>
@@ -157,14 +131,14 @@ export default function BursaryScholarshipsPage() {
                       <div className="flex justify-between text-sm mb-1">
                         <span className="text-muted-foreground">Utilization</span>
                         <span className="font-medium">
-                          {((scholarship.disbursed / scholarship.budget) * 100).toFixed(0)}%
+                          {scholarship.budget ? ((scholarship.disbursed || 0) / scholarship.budget * 100).toFixed(0) : 0}%
                         </span>
                       </div>
                       <div className="w-full bg-secondary rounded-full h-2">
                         <div
                           className="bg-green-500 h-2 rounded-full"
                           style={{
-                            width: `${(scholarship.disbursed / scholarship.budget) * 100}%`,
+                            width: `${scholarship.budget ? ((scholarship.disbursed || 0) / scholarship.budget) * 100 : 0}%`,
                           }}
                         />
                       </div>
@@ -190,38 +164,24 @@ export default function BursaryScholarshipsPage() {
                   <TableHead>Matric Number</TableHead>
                   <TableHead>Scholarship</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>CGPA</TableHead>
                   <TableHead>Applied Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {applications.map((app) => (
+                {applications?.map((app) => (
                   <TableRow key={app.id}>
                     <TableCell className="font-medium">{app.studentName}</TableCell>
-                    <TableCell className="font-mono">{app.matricNumber}</TableCell>
+                    <TableCell className="font-mono">{app.studentId}</TableCell>
                     <TableCell>{app.scholarshipName}</TableCell>
                     <TableCell className="font-semibold">
-                      ₦{app.amount.toLocaleString()}
+                      ₦{app.amountRequested.toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <Badge className="bg-green-500">{app.cgpa}</Badge>
+                      <Badge variant="outline">{app.status}</Badge>
                     </TableCell>
                     <TableCell>{new Date(app.appliedAt).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          app.status === "approved"
-                            ? "default"
-                            : app.status === "pending"
-                            ? "secondary"
-                            : "destructive"
-                        }
-                      >
-                        {app.status}
-                      </Badge>
-                    </TableCell>
                     <TableCell>
                       {app.status === "pending" ? (
                         <div className="flex gap-2">

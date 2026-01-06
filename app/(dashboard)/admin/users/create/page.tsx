@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { User, Mail, Phone, BookOpen, Save } from "lucide-react";
+import { adminService } from "@/lib/services";
 
 export default function CreateUserPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function CreateUserPage() {
     lastName: "",
     email: "",
     phone: "",
+    password: "",
     role: "",
     department: "",
     matricNumber: "",
@@ -34,7 +36,7 @@ export default function CreateUserPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.role) {
@@ -46,14 +48,38 @@ export default function CreateUserPage() {
       return;
     }
 
-    toast({
-      title: "User Created",
-      description: `User has been created successfully with role: ${formData.role}`,
-    });
+    try {
+      // Generate a temporary password if not provided
+      const password = formData.password || Math.random().toString(36).slice(-12) + "Temp!";
 
-    setTimeout(() => {
-      router.push("/admin/users");
-    }, 1500);
+      const userData = {
+        email: formData.email,
+        password: password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        role: formData.role as 'student' | 'lecturer' | 'admin' | 'hod' | 'bursary',
+        department: formData.department || undefined,
+        level: formData.role === 'student' ? formData.level : undefined,
+        matricNumber: formData.role === 'student' ? formData.matricNumber : undefined,
+      };
+
+      await adminService.createUser(userData);
+
+      toast({
+        title: "User Created Successfully",
+        description: `User has been created with role: ${formData.role}. Temporary password: ${password}`,
+      });
+
+      setTimeout(() => {
+        router.push("/admin/users");
+      }, 2000);
+    } catch (error) {
+      toast({
+        title: "Creation Failed",
+        description: "Failed to create user. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -136,6 +162,20 @@ export default function CreateUserPage() {
                   value={formData.phone}
                   onChange={(e) => handleChange("phone", e.target.value)}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Leave blank to auto-generate"
+                  value={formData.password}
+                  onChange={(e) => handleChange("password", e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Leave blank to auto-generate a temporary password
+                </p>
               </div>
             </CardContent>
           </Card>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,45 +17,81 @@ import {
   CreditCard,
 } from "lucide-react";
 import Link from "next/link";
-import { mockCourses, mockAssignments } from "@/lib/mock-data";
 import { formatDate } from "@/lib/utils";
+import { useApi } from "@/hooks/use-api";
+import { studentService, DashboardStats } from "@/lib/services";
 
 export default function StudentDashboardPage() {
-  // Mock stats
+  const { data: dashboardData, isLoading, execute } = useApi<DashboardStats>();
+
+  useEffect(() => {
+    execute(() => studentService.getDashboard(), {
+      errorMessage: "Failed to load dashboard data",
+    });
+  }, [execute]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="space-y-0 pb-2">
+                  <div className="h-4 bg-muted animate-pulse rounded" />
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-muted animate-pulse rounded" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Stats cards configuration
   const stats = [
     {
       title: "Enrolled Courses",
-      value: "5",
+      value: dashboardData?.enrolledCourses?.toString() || "0",
       icon: BookOpen,
       href: "/student/courses",
       color: "text-blue-500",
     },
     {
       title: "Pending Assignments",
-      value: "3",
+      value: dashboardData?.pendingAssignments?.toString() || "0",
       icon: FileText,
       href: "/student/assignments",
       color: "text-orange-500",
     },
     {
       title: "Payment Status",
-      value: "Verified",
+      value: dashboardData?.paymentStatus || "Pending",
       icon: DollarSign,
       href: "/student/payments",
       color: "text-green-500",
     },
     {
       title: "Current CGPA",
-      value: "4.5",
+      value: dashboardData?.cgpa?.toFixed(2) || "0.00",
       icon: Trophy,
       href: "/student/results",
       color: "text-purple-500",
     },
   ];
 
-  // Get recent items
-  const recentCourses = mockCourses.slice(0, 3);
-  const recentAssignments = mockAssignments.slice(0, 3);
+  // Get recent items from dashboard data
+  const recentCourses = dashboardData?.recentCourses || [];
+  const recentAssignments = dashboardData?.recentAssignments || [];
+  const upcomingEvents = dashboardData?.upcomingEvents || [];
 
   return (
     <DashboardLayout>
@@ -136,23 +173,29 @@ export default function StudentDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentCourses.map((course) => (
-                  <div
-                    key={course.id}
-                    className="flex items-start justify-between rounded-lg border border-border p-4"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium">{course.code}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {course.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {course.lecturer}
-                      </p>
+                {recentCourses.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No courses enrolled yet
+                  </p>
+                ) : (
+                  recentCourses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="flex items-start justify-between rounded-lg border border-border p-4"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-medium">{course.code}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {course.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {course.lecturer}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">{course.credits} Units</Badge>
                     </div>
-                    <Badge variant="secondary">{course.credits} Units</Badge>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -169,31 +212,37 @@ export default function StudentDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentAssignments.map((assignment) => {
-                  const isOverdue = assignment.status === "overdue";
-                  return (
-                    <div
-                      key={assignment.id}
-                      className="flex items-start justify-between rounded-lg border border-border p-4"
-                    >
-                      <div className="space-y-1 flex-1">
-                        <p className="font-medium">{assignment.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {assignment.courseName}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs">
-                          <Clock className="h-3 w-3" />
-                          <span className={isOverdue ? "text-destructive" : "text-muted-foreground"}>
-                            Due: {formatDate(assignment.dueDate)}
-                          </span>
+                {recentAssignments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No pending assignments
+                  </p>
+                ) : (
+                  recentAssignments.map((assignment) => {
+                    const isOverdue = assignment.status === "overdue";
+                    return (
+                      <div
+                        key={assignment.id}
+                        className="flex items-start justify-between rounded-lg border border-border p-4"
+                      >
+                        <div className="space-y-1 flex-1">
+                          <p className="font-medium">{assignment.title}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {assignment.courseName}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs">
+                            <Clock className="h-3 w-3" />
+                            <span className={isOverdue ? "text-destructive" : "text-muted-foreground"}>
+                              Due: {formatDate(assignment.dueDate)}
+                            </span>
+                          </div>
                         </div>
+                        <Badge variant={isOverdue ? "destructive" : "secondary"}>
+                          {assignment.totalMarks} marks
+                        </Badge>
                       </div>
-                      <Badge variant={isOverdue ? "destructive" : "secondary"}>
-                        {assignment.totalMarks} marks
-                      </Badge>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>
@@ -202,40 +251,46 @@ export default function StudentDashboardPage() {
         {/* Recent Notifications */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Notifications</CardTitle>
+            <CardTitle>Upcoming Events</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                <div>
-                  <p className="font-medium">Payment Verified</p>
-                  <p className="text-sm text-muted-foreground">
-                    Your tuition fee payment has been verified
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">2 hours ago</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
-                <div>
-                  <p className="font-medium">Assignment Reminder</p>
-                  <p className="text-sm text-muted-foreground">
-                    CSC 401 assignment due in 3 days
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">5 hours ago</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-blue-500 mt-0.5" />
-                <div>
-                  <p className="font-medium">New Course Material</p>
-                  <p className="text-sm text-muted-foreground">
-                    Lecture slides uploaded for Database Systems
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">1 day ago</p>
-                </div>
-              </div>
+              {upcomingEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No upcoming events
+                </p>
+              ) : (
+                upcomingEvents.slice(0, 3).map((event) => {
+                  const getEventIcon = () => {
+                    switch (event.type) {
+                      case 'assignment':
+                        return <FileText className="h-5 w-5 text-orange-500 mt-0.5" />;
+                      case 'quiz':
+                      case 'exam':
+                        return <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />;
+                      case 'class':
+                        return <BookOpen className="h-5 w-5 text-blue-500 mt-0.5" />;
+                      default:
+                        return <Calendar className="h-5 w-5 text-green-500 mt-0.5" />;
+                    }
+                  };
+
+                  return (
+                    <div key={event.id} className="flex items-start gap-3">
+                      {getEventIcon()}
+                      <div>
+                        <p className="font-medium">{event.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {event.courseCode && `${event.courseCode} • `}
+                          {formatDate(event.date)}
+                          {event.time && ` at ${event.time}`}
+                          {event.location && ` • ${event.location}`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>

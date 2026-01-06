@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   BookOpen,
@@ -24,6 +25,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { UserRole } from "@/lib/types";
+import { studentService } from "@/lib/services";
 
 interface SidebarProps {
   userRole: UserRole;
@@ -100,7 +102,39 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
 
 export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname();
-  const navItems = navItemsByRole[userRole] || studentNavItems;
+  const [assignmentCount, setAssignmentCount] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (userRole !== "student") return;
+
+    let isMounted = true;
+
+    const loadAssignments = async () => {
+      try {
+        const assignments = await studentService.getAssignments({ status: "pending" });
+        if (!isMounted) return;
+        setAssignmentCount(assignments?.length ?? 0);
+      } catch (error) {
+        if (!isMounted) return;
+        setAssignmentCount(undefined);
+        console.error("Failed to load assignments for sidebar", error);
+      }
+    };
+
+    loadAssignments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userRole]);
+
+  const baseNavItems = navItemsByRole[userRole] || studentNavItems;
+  const navItems =
+    userRole === "student"
+      ? baseNavItems.map((item) =>
+          item.title === "Assignments" ? { ...item, badge: assignmentCount } : item
+        )
+      : baseNavItems;
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card transition-transform">

@@ -7,19 +7,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { studentService, ResultsResponse } from "@/lib/services/studentService";
+import { Result } from "@/lib/types";
 
 export default function ResultAppealPage() {
   const { toast } = useToast();
   const [selectedCourse, setSelectedCourse] = useState("");
 
-  const courses = [
-    { code: "CSC 301", title: "Operating Systems", score: 58, grade: "C" },
-    { code: "CSC 303", title: "Database Systems", score: 62, grade: "B" },
-    { code: "CSC 305", title: "Software Engineering", score: 75, grade: "A" },
-    { code: "CSC 307", title: "Computer Networks", score: 55, grade: "C" },
-  ];
+  const { data: resultsResponse, isLoading, execute } = useApi<ResultsResponse>();
+
+  useEffect(() => {
+    execute(() => studentService.getResults(), {
+      errorMessage: "Failed to load results"
+    });
+  }, [execute]);
+
+  const courses = resultsResponse?.results?.filter(r => r.grade && r.grade !== 'F') || [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +35,19 @@ export default function ResultAppealPage() {
       variant: "success",
     });
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading results...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -63,18 +82,18 @@ export default function ResultAppealPage() {
             <div className="space-y-3">
               {courses.map((course) => (
                 <div
-                  key={course.code}
+                  key={course.courseCode}
                   className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                    selectedCourse === course.code
+                    selectedCourse === course.courseCode
                       ? "border-primary bg-primary/5"
                       : "hover:border-muted-foreground/50"
                   }`}
-                  onClick={() => setSelectedCourse(course.code)}
+                  onClick={() => setSelectedCourse(course.courseCode)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <p className="font-medium">
-                        {course.code} - {course.title}
+                        {course.courseCode} - {course.courseTitle}
                       </p>
                       <p className="text-sm text-muted-foreground">Click to select for appeal</p>
                     </div>
@@ -108,8 +127,8 @@ export default function ResultAppealPage() {
                 >
                   <option value="">Select a course</option>
                   {courses.map((course) => (
-                    <option key={course.code} value={course.code}>
-                      {course.code} - {course.title} (Score: {course.score})
+                    <option key={course.courseCode} value={course.courseCode}>
+                      {course.courseCode} - {course.courseTitle} (Score: {course.score})
                     </option>
                   ))}
                 </select>

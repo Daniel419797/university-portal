@@ -8,79 +8,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, PlayCircle, CheckCircle, AlertCircle } from "lucide-react";
-
-interface Quiz {
-  id: string;
-  courseCode: string;
-  courseName: string;
-  title: string;
-  duration: number;
-  totalMarks: number;
-  questionsCount: number;
-  startDate: string;
-  endDate: string;
-  status: "upcoming" | "active" | "completed" | "graded";
-  score?: number;
-}
+import { useEffect } from "react";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services";
+import { Quiz } from "@/lib/types";
 
 export default function StudentQuizzesPage() {
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
 
-  const quizzes: Quiz[] = [
-    {
-      id: "1",
-      courseCode: "CSC 401",
-      courseName: "Data Structures",
-      title: "Mid-Semester Quiz",
-      duration: 60,
-      totalMarks: 20,
-      questionsCount: 20,
-      startDate: "2026-01-10",
-      endDate: "2026-01-15",
-      status: "active",
-    },
-    {
-      id: "2",
-      courseCode: "CSC 402",
-      courseName: "Operating Systems",
-      title: "Weekly Quiz - Week 3",
-      duration: 30,
-      totalMarks: 10,
-      questionsCount: 10,
-      startDate: "2026-01-05",
-      endDate: "2026-01-08",
-      status: "active",
-    },
-    {
-      id: "3",
-      courseCode: "CSC 403",
-      courseName: "Software Engineering",
-      title: "Chapter 1-3 Quiz",
-      duration: 45,
-      totalMarks: 15,
-      questionsCount: 15,
-      startDate: "2025-12-20",
-      endDate: "2025-12-25",
-      status: "graded",
-      score: 13,
-    },
-    {
-      id: "4",
-      courseCode: "CSC 404",
-      courseName: "Computer Networks",
-      title: "Networking Fundamentals",
-      duration: 40,
-      totalMarks: 20,
-      questionsCount: 20,
-      startDate: "2025-12-15",
-      endDate: "2025-12-18",
-      status: "graded",
-      score: 18,
-    },
-  ];
+  const { data: quizzes, isLoading, execute } = useApi<Quiz[]>();
 
-  const activeQuizzes = quizzes.filter((q) => q.status === "active" || q.status === "upcoming");
-  const completedQuizzes = quizzes.filter((q) => q.status === "completed" || q.status === "graded");
+  useEffect(() => {
+    execute(() => studentService.getQuizzes(), {
+      errorMessage: "Failed to load quizzes"
+    });
+  }, [execute]);
+
+  // Defensive: support non-array payload shapes returned by the backend (e.g., { quizzes: [] } or { data: [] })
+  const quizList: Quiz[] = Array.isArray(quizzes)
+    ? quizzes
+    : (() => {
+        const obj = quizzes as unknown as { quizzes?: Quiz[]; data?: Quiz[] } | undefined;
+        if (!obj) return [] as Quiz[];
+        return Array.isArray(obj.quizzes) ? obj.quizzes : Array.isArray(obj.data) ? obj.data : [];
+      })();
+
+  const activeQuizzes = (quizList || []).filter((q) => q.status === "active" || q.status === "upcoming");
+  const completedQuizzes = (quizList || []).filter((q) => q.status === "completed" || q.status === "graded");
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -214,16 +168,16 @@ export default function StudentQuizzesPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <h3 className="font-medium">{quiz.title}</h3>
-                  {quiz.score !== undefined && (
+                  {quiz.attempt?.score !== undefined && (
                     <>
                       <div>
                         <div className="flex justify-between text-sm mb-2">
                           <span>Score</span>
                           <span className="font-medium">
-                            {quiz.score}/{quiz.totalMarks} ({((quiz.score / quiz.totalMarks) * 100).toFixed(0)}%)
+                            {quiz.attempt.score}/{quiz.totalMarks} ({((quiz.attempt.score / quiz.totalMarks) * 100).toFixed(0)}%)
                           </span>
                         </div>
-                        <Progress value={(quiz.score / quiz.totalMarks) * 100} />
+                        <Progress value={(quiz.attempt.score / quiz.totalMarks) * 100} />
                       </div>
                     </>
                   )}

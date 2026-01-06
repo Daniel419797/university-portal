@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,42 +10,23 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, CheckCircle, XCircle, Eye, FileText } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { bursaryService } from "@/lib/services/hodBursaryService";
 
 export default function BursaryPaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  
+  const { data: payments, isLoading, execute } = useApi<Array<{ id: string; studentId: string; studentName: string; matricNumber?: string; amount: number; status: string; paymentDate: string; reference: string; type?: string }>>();
 
-  const payments = [
-    {
-      id: "1",
-      studentName: "John Doe",
-      matricNumber: "STU/2023/001",
-      amount: 150000,
-      type: "Tuition",
-      reference: "PAY/2026/001234",
-      date: "2026-01-01",
-      status: "pending",
-    },
-    {
-      id: "2",
-      studentName: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      amount: 150000,
-      type: "Tuition",
-      reference: "PAY/2026/001235",
-      date: "2026-01-01",
-      status: "verified",
-    },
-    {
-      id: "3",
-      studentName: "Michael Johnson",
-      matricNumber: "STU/2023/005",
-      amount: 50000,
-      type: "Hostel",
-      reference: "PAY/2026/001236",
-      date: "2025-12-30",
-      status: "verified",
-    },
-  ];
+  useEffect(() => {
+    execute(() => bursaryService.getPayments({ 
+      status: statusFilter,
+      studentId: searchQuery || undefined
+    }), {
+      errorMessage: "Failed to load payments"
+    });
+  }, [execute, statusFilter, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -60,8 +41,21 @@ export default function BursaryPaymentsPage() {
     }
   };
 
-  const pendingPayments = payments.filter((p) => p.status === "pending");
-  const verifiedPayments = payments.filter((p) => p.status === "verified");
+  const pendingPayments = payments?.filter((p) => p.status === "pending") || [];
+  const verifiedPayments = payments?.filter((p) => p.status === "verified") || [];
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading payments...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -89,13 +83,13 @@ export default function BursaryPaymentsPage() {
         {/* Tabs */}
         <Tabs defaultValue="pending">
           <TabsList>
-            <TabsTrigger value="pending">
+            <TabsTrigger value="pending" onClick={() => setStatusFilter("pending")}>
               Pending Verification ({pendingPayments.length})
             </TabsTrigger>
-            <TabsTrigger value="verified">
+            <TabsTrigger value="verified" onClick={() => setStatusFilter("verified")}>
               Verified ({verifiedPayments.length})
             </TabsTrigger>
-            <TabsTrigger value="all">All Payments ({payments.length})</TabsTrigger>
+            <TabsTrigger value="all" onClick={() => setStatusFilter(undefined)}>All Payments ({payments?.length || 0})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
@@ -118,42 +112,50 @@ export default function BursaryPaymentsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingPayments.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-medium">{payment.studentName}</TableCell>
-                        <TableCell className="font-mono">{payment.matricNumber}</TableCell>
-                        <TableCell>{payment.type}</TableCell>
-                        <TableCell className="font-semibold">
-                          ₦{payment.amount.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {payment.reference}
-                        </TableCell>
-                        <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/bursary/payments/${payment.id}`}>
-                                <Eye className="mr-1 h-3 w-3" />
-                                View
-                              </Link>
-                            </Button>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="bg-green-500 hover:bg-green-600"
-                            >
-                              <CheckCircle className="mr-1 h-3 w-3" />
-                              Verify
-                            </Button>
-                            <Button variant="destructive" size="sm">
-                              <XCircle className="mr-1 h-3 w-3" />
-                              Reject
-                            </Button>
-                          </div>
+                    {pendingPayments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          No pending payments
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      pendingPayments.map((payment) => (
+                        <TableRow key={payment.id}>
+                          <TableCell className="font-medium">{payment.studentName}</TableCell>
+                          <TableCell className="font-mono">{payment.studentId}</TableCell>
+                          <TableCell>N/A</TableCell>
+                          <TableCell className="font-semibold">
+                            ₦{payment.amount.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {payment.reference}
+                          </TableCell>
+                          <TableCell>{new Date(payment.paymentDate).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" asChild>
+                                <Link href={`/bursary/payments/${payment.id}`}>
+                                  <Eye className="mr-1 h-3 w-3" />
+                                  View
+                                </Link>
+                              </Button>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="bg-green-500 hover:bg-green-600"
+                              >
+                                <CheckCircle className="mr-1 h-3 w-3" />
+                                Verify
+                              </Button>
+                              <Button variant="destructive" size="sm">
+                                <XCircle className="mr-1 h-3 w-3" />
+                                Reject
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -183,15 +185,15 @@ export default function BursaryPaymentsPage() {
                     {verifiedPayments.map((payment) => (
                       <TableRow key={payment.id}>
                         <TableCell className="font-medium">{payment.studentName}</TableCell>
-                        <TableCell className="font-mono">{payment.matricNumber}</TableCell>
-                        <TableCell>{payment.type}</TableCell>
+                        <TableCell className="font-mono">{payment.matricNumber || payment.studentId}</TableCell>
+                        <TableCell>{payment.type || 'N/A'}</TableCell>
                         <TableCell className="font-semibold">
                           ₦{payment.amount.toLocaleString()}
                         </TableCell>
                         <TableCell className="font-mono text-sm">
                           {payment.reference}
                         </TableCell>
-                        <TableCell>{new Date(payment.date).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(payment.paymentDate).toLocaleDateString()}</TableCell>
                         <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       </TableRow>
                     ))}

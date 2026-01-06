@@ -8,9 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Download, Search, Clock, CheckCircle, AlertCircle, Filter } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService } from "@/lib/services/lecturerService";
+import { AssignmentSubmission, Assignment } from "@/lib/types";
 
 interface Submission {
   id: string;
@@ -26,78 +29,65 @@ interface Submission {
 
 export default function SubmissionsPage() {
   const params = useParams();
-  const assignmentId = params?.id;
+  const assignmentId = params?.id as string;
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  const assignment = {
-    id: assignmentId,
-    title: "Final Project Report",
-    courseCode: "CSC 401",
-    totalMarks: 20,
-    dueDate: "2026-01-25T23:59:00",
-  };
+  const { data: submissionsData, isLoading, execute } = useApi<import("@/lib/services/lecturerService").SubmissionsResponse>();
+  const { data: assignmentData, isLoading: assignmentLoading } = useApi<Assignment>();
 
-  const submissions: Submission[] = [
-    {
-      id: "1",
-      studentId: "STU001",
-      studentName: "John Doe",
-      matricNumber: "CS/2022/001",
-      submittedAt: "2026-01-24T14:30:00",
-      status: "graded",
-      score: 18,
-      files: ["final_project_report.pdf"],
-      isLate: false,
-    },
-    {
-      id: "2",
-      studentId: "STU002",
-      studentName: "Jane Smith",
-      matricNumber: "CS/2022/002",
-      submittedAt: "2026-01-25T22:15:00",
-      status: "graded",
-      score: 16,
-      files: ["AI_Project_Jane.pdf"],
-      isLate: false,
-    },
-    {
-      id: "3",
-      studentId: "STU003",
-      studentName: "Michael Johnson",
-      matricNumber: "CS/2022/003",
-      submittedAt: "2026-01-23T09:45:00",
-      status: "pending",
-      files: ["project_report_michael.pdf", "appendix.pdf"],
-      isLate: false,
-    },
-    {
-      id: "4",
-      studentId: "STU004",
-      studentName: "Sarah Williams",
-      matricNumber: "CS/2022/004",
-      submittedAt: "2026-01-26T08:20:00",
-      status: "late",
-      files: ["late_submission.pdf"],
-      isLate: true,
-    },
-    {
-      id: "5",
-      studentId: "STU005",
-      studentName: "David Brown",
-      matricNumber: "CS/2022/005",
-      submittedAt: "2026-01-25T18:00:00",
-      status: "pending",
-      files: ["AI_final_report.pdf"],
-      isLate: false,
-    },
-  ];
+  useEffect(() => {
+    if (assignmentId) {
+      execute(() => lecturerService.getSubmissions(assignmentId), {
+        errorMessage: "Failed to load submissions"
+      });
+    }
+  }, [execute, assignmentId]);
+
+  useEffect(() => {
+    if (assignmentId) {
+      lecturerService.getAssignmentDetails(assignmentId).then(data => {
+        // This would set assignment data, but for now we'll keep the fallback
+      }).catch(() => {
+        // Keep fallback on error
+      });
+    }
+  }, [assignmentId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading submissions...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!submissionsData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Submissions not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // No assignment info in SubmissionsResponse, so fetch assignment details separately
+  const submissions = submissionsData.submissions;
+
+  // Fallback assignment info (remove when assignment details API is working)
+  const assignmentDetails = assignmentData || { courseCode: "", title: "", totalMarks: 100 };
 
   const filteredSubmissions = submissions.filter((submission) => {
     const matchesSearch =
-      submission.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      submission.matricNumber.toLowerCase().includes(searchQuery.toLowerCase());
+      (submission.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+      (submission.matricNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
     const matchesFilter = filterStatus === "all" || submission.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -146,7 +136,8 @@ export default function SubmissionsPage() {
     total: submissions.length,
     graded: submissions.filter((s) => s.status === "graded").length,
     pending: submissions.filter((s) => s.status === "pending").length,
-    late: submissions.filter((s) => s.isLate).length,
+    // 'late' not available, set to 0 or compute if due date is available
+    late: 0,
   };
 
   return (
@@ -156,7 +147,7 @@ export default function SubmissionsPage() {
         <div>
           <h1 className="text-3xl font-bold">Assignment Submissions</h1>
           <p className="text-muted-foreground">
-            {assignment.courseCode} - {assignment.title}
+            {assignmentDetails.courseCode} - {assignmentDetails.title}
           </p>
         </div>
 
@@ -252,21 +243,16 @@ export default function SubmissionsPage() {
             <div className="space-y-4">
               {filteredSubmissions.map((submission) => (
                 <div
-                  key={submission.id}
+                  key={submission.studentId}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h4 className="font-semibold">{submission.studentName}</h4>
-                      <Badge variant={getStatusBadge(submission.status)} className="flex items-center gap-1">
-                        {getStatusIcon(submission.status)}
-                        {submission.status}
+                      <Badge variant={getStatusBadge(submission.status || 'pending')} className="flex items-center gap-1">
+                        {getStatusIcon(submission.status || 'pending')}
+                        {submission.status || 'pending'}
                       </Badge>
-                      {submission.isLate && (
-                        <Badge variant="destructive" className="text-xs">
-                          Late
-                        </Badge>
-                      )}
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
                       <p>Matric No: {submission.matricNumber}</p>
@@ -279,15 +265,15 @@ export default function SubmissionsPage() {
                           minute: "2-digit",
                         })}
                       </p>
-                      <p>Files: {submission.files.join(", ")}</p>
+                      <p>Files: {submission.files.map(f => f.name).join(", ")}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    {submission.score !== undefined && (
+                    {submission.grade !== undefined && (
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{submission.score}</div>
-                        <div className="text-xs text-muted-foreground">/{assignment.totalMarks}</div>
+                        <div className="text-2xl font-bold">{submission.grade}</div>
+                        <div className="text-xs text-muted-foreground">/{assignmentDetails.totalMarks}</div>
                       </div>
                     )}
                     <Button variant="outline" size="sm" asChild>

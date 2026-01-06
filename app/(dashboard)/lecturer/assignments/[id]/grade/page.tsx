@@ -9,8 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Download, Save, Send, AlertCircle } from "lucide-react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService } from "@/lib/services/lecturerService";
+import { UploadedFile, AssignmentSubmission, Assignment } from "@/lib/types";
 
 export default function GradeAssignmentPage() {
   const params = useParams();
@@ -18,39 +21,56 @@ export default function GradeAssignmentPage() {
   const router = useRouter();
   const { toast } = useToast();
   
-  const assignmentId = params?.id;
-  const studentId = searchParams?.get("student");
+  const assignmentId = params?.id as string;
+  const studentId = searchParams?.get("student") as string;
 
-  const [score, setScore] = useState("18");
-  const [feedback, setFeedback] = useState("Excellent work! Your report is comprehensive and well-structured. The implementation details are clearly explained, and your results demonstrate a strong understanding of AI concepts. Minor improvement needed in the conclusion section.");
+  const { data: submission, isLoading: submissionLoading, execute: executeSubmission } = useApi<AssignmentSubmission>();
+  const { data: assignment, isLoading: assignmentLoading, execute: executeAssignment } = useApi<Assignment>();
+
+  const [score, setScore] = useState("");
+  const [feedback, setFeedback] = useState("");
   const [rubricScores, setRubricScores] = useState({
-    content: "8",
-    presentation: "5",
-    analysis: "3",
-    references: "2",
+    content: "",
+    presentation: "",
+    analysis: "",
+    references: "",
   });
 
-  const assignment = {
-    id: assignmentId,
-    title: "Final Project Report",
-    courseCode: "CSC 401",
-    totalMarks: 20,
-    passingMarks: 12,
-  };
+  useEffect(() => {
+    if (assignmentId && studentId) {
+      executeSubmission(() => lecturerService.getSubmission(assignmentId, studentId), {
+        errorMessage: "Failed to load submission"
+      });
+      executeAssignment(() => lecturerService.getAssignmentDetails(assignmentId), {
+        errorMessage: "Failed to load assignment"
+      });
+    }
+  }, [executeSubmission, executeAssignment, assignmentId, studentId]);
 
-  const submission = {
-    studentId: studentId,
-    studentName: "John Doe",
-    matricNumber: "CS/2022/001",
-    submittedAt: "2026-01-24T14:30:00",
-    files: [
-      { name: "final_project_report.pdf", size: "2.5 MB" },
-      { name: "appendix.pdf", size: "1.2 MB" },
-    ],
-    isLate: false,
-    currentScore: score ? parseInt(score) : null,
-    feedback: feedback,
-  };
+  const isLoading = submissionLoading || assignmentLoading;
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading submission...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!submission || !assignment) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Submission or assignment not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const rubric = [
     { id: "content", label: "Content Quality", maxScore: 8, description: "Depth and accuracy of content" },
@@ -162,7 +182,7 @@ export default function GradeAssignmentPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {submission.files.map((file, index) => (
+                  {submission.files.map((file: UploadedFile, index: number) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-3 border rounded-lg"
@@ -252,7 +272,7 @@ export default function GradeAssignmentPage() {
                       required
                     />
                     <span className="text-muted-foreground">/ {assignment.totalMarks}</span>
-                    {score && parseInt(score) < assignment.passingMarks && (
+                    {score && assignment.passingMarks && parseInt(score) < assignment.passingMarks && (
                       <Badge variant="destructive" className="ml-2">
                         Below Passing
                       </Badge>
@@ -323,7 +343,7 @@ export default function GradeAssignmentPage() {
             </Card>
 
             {/* Warning for Low Scores */}
-            {score && parseInt(score) < assignment.passingMarks && (
+            {score && assignment.passingMarks && parseInt(score) < assignment.passingMarks && (
               <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
                 <CardContent className="pt-6">
                   <div className="flex gap-2 text-yellow-800 dark:text-yellow-200">

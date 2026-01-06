@@ -6,128 +6,98 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, BookOpen, CreditCard, Award, MessageSquare, Settings, Trash2, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { notificationService, type Notification } from "@/lib/services";
+import { useApi } from "@/hooks/use-api";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [notificationList, setNotificationList] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { isLoading: isLoadingNotifications, execute: executeNotifications } = useApi<{ notifications: Notification[]; total: number; unreadCount: number } | null>();
+  const { execute: executeUnreadCount } = useApi<number | null>();
 
-  const notifications = [
-    {
-      id: 1,
-      type: "assignment",
-      title: "New Assignment Posted",
-      message: "Dr. Michael Chen has posted a new assignment for CSC 401 - Artificial Intelligence",
-      timestamp: new Date("2025-01-28T10:30:00"),
-      isRead: false,
-      icon: BookOpen,
-    },
-    {
-      id: 2,
-      type: "grade",
-      title: "Grade Published",
-      message: "Your grade for 'Final Project Report' has been published: 85/100 (A)",
-      timestamp: new Date("2025-01-27T15:45:00"),
-      isRead: false,
-      icon: Award,
-    },
-    {
-      id: 3,
-      type: "payment",
-      title: "Payment Deadline Reminder",
-      message: "Your school fees payment is due in 5 days. Amount remaining: ₦150,000",
-      timestamp: new Date("2025-01-26T09:00:00"),
-      isRead: true,
-      icon: CreditCard,
-    },
-    {
-      id: 4,
-      type: "announcement",
-      title: "Semester Break Announcement",
-      message: "The semester break will commence from February 10th to March 3rd, 2025",
-      timestamp: new Date("2025-01-25T14:20:00"),
-      isRead: true,
-      icon: MessageSquare,
-    },
-    {
-      id: 5,
-      type: "quiz",
-      title: "Quiz Available",
-      message: "A new quiz 'Mid-Semester Test' is now available for CSC 301 - Data Structures",
-      timestamp: new Date("2025-01-24T08:15:00"),
-      isRead: false,
-      icon: BookOpen,
-    },
-    {
-      id: 6,
-      type: "grade",
-      title: "Assignment Graded",
-      message: "Your submission for 'Database Design Assignment' has been graded: 92/100 (A)",
-      timestamp: new Date("2025-01-23T16:30:00"),
-      isRead: true,
-      icon: Award,
-    },
-    {
-      id: 7,
-      type: "announcement",
-      title: "Campus Security Update",
-      message: "Please note the new security protocols for campus access effective February 1st",
-      timestamp: new Date("2025-01-22T11:00:00"),
-      isRead: true,
-      icon: MessageSquare,
-    },
-    {
-      id: 8,
-      type: "assignment",
-      title: "Assignment Due Soon",
-      message: "Reminder: 'Research Paper' for CSC 401 is due in 2 days",
-      timestamp: new Date("2025-01-21T13:45:00"),
-      isRead: false,
-      icon: BookOpen,
-    },
-  ];
+  const normalizeNotifications = (data: unknown): Notification[] => {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === "object" && "notifications" in data) {
+      const notifications = (data as { notifications?: unknown }).notifications;
+      return Array.isArray(notifications) ? notifications : [];
+    }
+    return [];
+  };
 
-  const [notificationList, setNotificationList] = useState(notifications);
-
-  const handleMarkAsRead = (id: number) => {
-    setNotificationList(
-      notificationList.map((notif) =>
-        notif.id === id ? { ...notif, isRead: true } : notif
-      )
-    );
-    toast({
-      title: "Marked as Read",
-      description: "Notification has been marked as read.",
+  useEffect(() => {
+    executeNotifications(() => notificationService.getNotifications(), {
+      errorMessage: "Failed to load notifications",
+      onSuccess: (data) => {
+        const list = normalizeNotifications(data);
+        setNotificationList(list);
+        setUnreadCount(list.filter((n) => !n.isRead).length);
+      },
     });
+
+    executeUnreadCount(() => notificationService.getUnreadCount(), {
+      errorMessage: "Failed to load unread count",
+      onSuccess: (count) => setUnreadCount(typeof count === "number" ? count : 0),
+    });
+  }, [executeNotifications, executeUnreadCount]);
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      const wasUnread = notificationList.some((n) => n.id === id && !n.isRead);
+      await notificationService.markAsRead(id);
+      setNotificationList((prev) => prev.map((notif) => (notif.id === id ? { ...notif, isRead: true } : notif)));
+      if (wasUnread) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+      toast({ title: "Marked as Read", description: "Notification has been marked as read." });
+    } catch (error) {
+      toast({ title: "Unable to mark as read", description: "Please try again.", variant: "destructive" });
+    }
   };
 
   const handleMarkAllAsRead = () => {
-    setNotificationList(
-      notificationList.map((notif) => ({ ...notif, isRead: true }))
-    );
-    toast({
-      title: "All Marked as Read",
-      description: "All notifications have been marked as read.",
-    });
+    const unreadIds = notificationList.filter((n) => !n.isRead).map((n) => n.id);
+    Promise.all(unreadIds.map((id) => notificationService.markAsRead(id)))
+      .then(() => {
+        setNotificationList((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
+        setUnreadCount(0);
+        toast({ title: "All Marked as Read", description: "All notifications have been marked as read." });
+      })
+      .catch(() => {
+        toast({ title: "Unable to mark all", description: "Please try again.", variant: "destructive" });
+      });
   };
 
-  const handleDelete = (id: number) => {
-    setNotificationList(notificationList.filter((notif) => notif.id !== id));
-    toast({
-      title: "Notification Deleted",
-      description: "The notification has been removed.",
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      const wasUnread = notificationList.some((n) => n.id === id && !n.isRead);
+      await notificationService.deleteNotification(id);
+      setNotificationList((prev) => prev.filter((notif) => notif.id !== id));
+      if (wasUnread) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+      toast({ title: "Notification Deleted", description: "The notification has been removed." });
+    } catch (error) {
+      toast({ title: "Unable to delete", description: "Please try again.", variant: "destructive" });
+    }
   };
 
   const handleDeleteAll = () => {
-    setNotificationList([]);
-    toast({
-      title: "All Deleted",
-      description: "All notifications have been cleared.",
-    });
+    const ids = notificationList.map((n) => n.id);
+    Promise.all(ids.map((id) => notificationService.deleteNotification(id)))
+      .then(() => {
+        setNotificationList([]);
+        setUnreadCount(0);
+        toast({ title: "All Deleted", description: "All notifications have been cleared." });
+      })
+      .catch(() => {
+        toast({ title: "Unable to clear", description: "Please try again.", variant: "destructive" });
+      });
   };
 
   const filteredNotifications = notificationList.filter((notif) => {
@@ -144,7 +114,7 @@ export default function NotificationsPage() {
     return matchesFilter && matchesSearch;
   });
 
-  const unreadCount = notificationList.filter((n) => !n.isRead).length;
+  const readCount = Math.max(notificationList.length - unreadCount, 0);
 
   const getNotificationColor = (type: string) => {
     switch (type) {
@@ -177,43 +147,68 @@ export default function NotificationsPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Notifications</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Notifications</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "All caught up!"}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} disabled={unreadCount === 0}>
-              <Check className="mr-2 h-4 w-4" />
-              Mark All Read
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleMarkAllAsRead} 
+              disabled={unreadCount === 0}
+              className="flex-1 sm:flex-none"
+            >
+              <Check className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Mark All Read</span>
+              <span className="sm:hidden">Read All</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDeleteAll} disabled={notificationList.length === 0}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Clear All
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDeleteAll} 
+              disabled={notificationList.length === 0}
+              className="flex-1 sm:flex-none"
+            >
+              <Trash2 className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Clear All</span>
+              <span className="sm:hidden">Clear</span>
             </Button>
           </div>
         </div>
 
         {/* Search and Filter */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex gap-4">
+          <CardContent className="pt-4 md:pt-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1">
                 <Input
                   placeholder="Search notifications..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full"
                 />
               </div>
-              <Tabs value={filter} onValueChange={(v) => setFilter(v as "all" | "unread" | "read")} className="w-auto">
-                <TabsList>
-                  <TabsTrigger value="all">All ({notificationList.length})</TabsTrigger>
-                  <TabsTrigger value="unread">Unread ({unreadCount})</TabsTrigger>
-                  <TabsTrigger value="read">Read ({notificationList.length - unreadCount})</TabsTrigger>
+              <Tabs 
+                value={filter} 
+                onValueChange={(v) => setFilter(v as "all" | "unread" | "read")} 
+                className="w-full sm:w-auto"
+              >
+                <TabsList className="grid grid-cols-3 w-full sm:w-auto">
+                  <TabsTrigger value="all" className="text-xs sm:text-sm">
+                    All ({notificationList.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="unread" className="text-xs sm:text-sm">
+                    Unread ({unreadCount})
+                  </TabsTrigger>
+                  <TabsTrigger value="read" className="text-xs sm:text-sm">
+                    Read ({readCount})
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -222,36 +217,53 @@ export default function NotificationsPage() {
 
         {/* Notifications List */}
         <div className="space-y-3">
-          {filteredNotifications.length === 0 ? (
+          {isLoadingNotifications && (
             <Card>
               <CardContent className="py-12 text-center">
-                <Bell className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">No notifications to display</p>
+                <p className="text-sm text-muted-foreground">Loading notifications...</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isLoadingNotifications && filteredNotifications.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Bell className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-sm text-muted-foreground">No notifications to display</p>
               </CardContent>
             </Card>
           ) : (
             filteredNotifications.map((notif) => {
-              const Icon = notif.icon;
+              const iconMap: Record<string, typeof BookOpen> = {
+                assignment: BookOpen,
+                grade: Award,
+                payment: CreditCard,
+                announcement: MessageSquare,
+                quiz: BookOpen,
+              };
+              const Icon = iconMap[notif.type] || MessageSquare;
               return (
                 <Card key={notif.id} className={!notif.isRead ? "border-l-4 border-l-primary" : ""}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className={`p-2 rounded-lg ${getNotificationColor(notif.type)}`}>
-                        <Icon className="h-5 w-5" />
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className={`p-2 rounded-lg ${getNotificationColor(notif.type)} flex-shrink-0`}>
+                        <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-1">
-                          <h3 className="font-semibold">{notif.title}</h3>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-1 gap-2">
+                          <h3 className="font-semibold text-sm sm:text-base leading-tight">{notif.title}</h3>
                           {!notif.isRead && (
-                            <Badge variant="default" className="text-xs">
+                            <Badge variant="default" className="text-xs flex-shrink-0">
                               New
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">{notif.message}</p>
-                        <div className="flex items-center justify-between">
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">
+                          {notif.message}
+                        </p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                           <p className="text-xs text-muted-foreground">
-                            {formatTimestamp(notif.timestamp)}
+                            {formatTimestamp(new Date(notif.timestamp))}
                           </p>
                           <div className="flex gap-2">
                             {!notif.isRead && (
@@ -259,17 +271,20 @@ export default function NotificationsPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleMarkAsRead(notif.id)}
+                                className="h-8 px-2 sm:px-3"
                               >
                                 <Check className="mr-1 h-3 w-3" />
-                                Mark Read
+                                <span className="text-xs">Mark Read</span>
                               </Button>
                             )}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDelete(notif.id)}
+                              className="h-8 px-2 sm:px-3"
                             >
                               <Trash2 className="h-3 w-3" />
+                              <span className="sr-only">Delete</span>
                             </Button>
                           </div>
                         </div>

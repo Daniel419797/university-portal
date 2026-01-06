@@ -11,9 +11,19 @@ export interface User {
   lastName: string;
   role: UserRole;
   avatar?: string;
+  phoneNumber?: string;
   studentId?: string;
   department?: string;
   level?: string;
+  address?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  stateOfOrigin?: string;
+  bloodGroup?: string;
+  emergencyContact?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Course Types
@@ -55,12 +65,25 @@ export interface Assignment {
   id: string;
   courseId: string;
   courseName: string;
+  courseCode?: string;
+  course?: string;
   title: string;
   description: string;
   dueDate: string;
   totalMarks: number;
+  passingMarks?: number;
   status: "pending" | "submitted" | "graded" | "late" | "overdue";
   submission?: AssignmentSubmission;
+  submissions?: number;
+  graded?: number;
+  totalStudents?: number;
+  submissionStatus?: "submitted" | "graded" | "pending";
+  submittedDate?: string;
+  instructions?: string[];
+  requirements?: string[];
+  lecturer?: string;
+  grade?: number;
+  feedback?: string;
 }
 
 export interface AssignmentSubmission {
@@ -72,6 +95,10 @@ export interface AssignmentSubmission {
   comment?: string;
   grade?: number;
   feedback?: string;
+  isLate?: boolean;
+  studentName?: string;
+  matricNumber?: string;
+  status?: 'pending' | 'graded';
 }
 
 export interface UploadedFile {
@@ -87,6 +114,7 @@ export interface Quiz {
   id: string;
   courseId: string;
   courseName: string;
+  courseCode?: string;
   title: string;
   description: string;
   duration: number;
@@ -94,8 +122,23 @@ export interface Quiz {
   questionsCount: number;
   startDate: string;
   endDate: string;
-  status: "upcoming" | "active" | "completed" | "graded";
+  status: "upcoming" | "active" | "completed" | "graded" | "closed";
   attempt?: QuizAttempt;
+  totalStudents?: number;
+  attemptedCount?: number;
+  completedCount?: number;
+  averageScore?: number;
+  passingMarks?: number;
+  attemptsAllowed?: number;
+  questionTypes?: { type: string; count: number }[];
+  instructions?: string[];
+  highestScore?: number;
+  lowestScore?: number;
+  createdAt?: string;
+  shuffleQuestions?: boolean;
+  showResults?: boolean;
+  attemptsUsed?: number;
+  lecturer?: string;
 }
 
 export interface QuizQuestion {
@@ -130,6 +173,14 @@ export interface Result {
   gradePoints: number;
   semester: string;
   session: string;
+  matricNumber?: string;
+  studentName?: string;
+  ca?: number;
+  exam?: number;
+  total?: number;
+  status?: string;
+  code?: string;
+  title?: string;
 }
 
 export interface Transcript {
@@ -147,14 +198,31 @@ export interface Transcript {
 export interface Payment {
   id: string;
   studentId: string;
+  studentName: string;
+  matricNumber: string;
+  email: string;
+  phone: string;
+  department: string;
+  level: string;
+  session: string;
+  semester: string;
   type: string;
   amount: number;
-  status: "pending" | "verified" | "rejected" | "processing";
+  paymentMethod: string;
+  bank: string;
   reference: string;
-  description: string;
+  bankReference: string;
+  proofOfPayment: string;
+  status: "pending" | "verified" | "rejected" | "processing" | "completed" | "failed" | "cancelled";
   date: string;
   verifiedBy?: string;
   verifiedAt?: string;
+  description?: string;
+  paymentDate?: string;
+  dueDate?: string;
+  currency: string;
+  transactionId?: string;
+  paymentType?: string;
 }
 
 export interface PaymentReceipt {
@@ -167,6 +235,15 @@ export interface PaymentReceipt {
   type: string;
   date: string;
   session: string;
+  transactionId?: string;
+  department?: string;
+  level?: string;
+  paymentType?: string;
+  paymentMethod?: string;
+  processingFee?: number;
+  total?: number;
+  verifiedBy?: string;
+  verifiedDate?: string;
 }
 
 // Hostel Types
@@ -274,6 +351,7 @@ export interface Message {
   read: boolean;
   sentAt: string;
   replies?: Message[];
+  createdAt?: string;
 }
 
 // Scholarship Types
@@ -287,6 +365,9 @@ export interface Scholarship {
   status: "open" | "closed";
   slots: number;
   applicants: number;
+  recipients?: number;
+  budget?: number;
+  disbursed?: number;
 }
 
 export interface ScholarshipApplication {
@@ -348,6 +429,39 @@ export interface AuditLog {
   changes?: Record<string, unknown>;
   ipAddress: string;
   timestamp: string;
+}
+
+// Staff Types
+export interface StaffMember {
+  id: string;
+  staffId?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  position?: string;
+  department?: string;
+  office?: string;
+  joinDate?: string;
+  status?: string;
+  qualifications?: string[];
+  specialization?: string[];
+  courses?: {
+    code: string;
+    name: string;
+    level: string;
+    students: number;
+  }[];
+  students?: {
+    name: string;
+    matricNumber: string;
+    level: string;
+    project: string;
+  }[];
+  publications?: {
+    title: string;
+    journal: string;
+    year: number;
+  }[];
 }
 
 export interface SystemSettings {

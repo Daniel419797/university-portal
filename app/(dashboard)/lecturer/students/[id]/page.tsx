@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,44 +12,68 @@ import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, BookOpen, 
   TrendingUp, Award, FileText, Clock
 } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService, StudentProfile as LecturerStudentProfile } from "@/lib/services/lecturerService";
 
 export default function StudentProfilePage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const studentId = params.id as string;
 
-  // Mock student data
+  const { data: studentData, isLoading, execute } = useApi<LecturerStudentProfile>();
+
+  useEffect(() => {
+    if (studentId) {
+      execute(() => lecturerService.getStudentProfile(studentId), {
+        errorMessage: "Failed to load student profile"
+      });
+    }
+  }, [execute, studentId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading student profile...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!studentData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Student not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const student = {
-    id: params.id,
-    name: "John Doe",
-    matricNumber: "CS/2021/001",
-    email: "john.doe@university.edu",
-    phone: "+234 801 234 5678",
-    level: "400 Level",
-    department: "Computer Science",
-    faculty: "Science",
-    cgpa: 4.85,
-    status: "active",
-    avatar: "/avatars/student.png",
-    dateOfBirth: "1999-05-15",
-    address: "123 University Road, Lagos",
-    guardianName: "Jane Doe",
-    guardianPhone: "+234 802 345 6789",
+    id: studentData.id,
+    name: studentData.name,
+    matricNumber: studentData.matricNumber,
+    email: studentData.email,
+    phone: studentData.phone,
+    level: studentData.level,
+    department: studentData.department,
+    faculty: studentData.faculty,
+    cgpa: studentData.cgpa,
+    status: studentData.status,
+    avatar: studentData.avatar,
+    dateOfBirth: studentData.dateOfBirth,
+    address: studentData.address,
+    guardianName: studentData.guardianName,
+    guardianPhone: studentData.guardianPhone,
   };
 
-  const coursePerformance = [
-    { code: "CSC401", title: "Software Engineering", score: 88, grade: "A", semester: "First Semester" },
-    { code: "CSC402", title: "Database Systems", score: 92, grade: "A", semester: "First Semester" },
-    { code: "CSC403", title: "Computer Networks", score: 85, grade: "A", semester: "First Semester" },
-    { code: "CSC404", title: "Operating Systems", score: 90, grade: "A", semester: "First Semester" },
-  ];
-
-  const attendance = [
-    { course: "CSC401", present: 28, total: 30, percentage: 93.3 },
-    { course: "CSC402", present: 27, total: 30, percentage: 90.0 },
-    { course: "CSC403", present: 29, total: 30, percentage: 96.7 },
-    { course: "CSC404", present: 26, total: 30, percentage: 86.7 },
-  ];
+  const coursePerformance = studentData.courses || [];
+  const attendance = studentData.attendance || [];
 
   const getGradeColor = (grade: string) => {
     switch (grade) {
@@ -139,7 +164,7 @@ export default function StudentProfilePage() {
                   <p className="text-sm text-muted-foreground mb-1">Date of Birth</p>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm">{new Date(student.dateOfBirth).toLocaleDateString()}</p>
+                    <p className="text-sm">{student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -213,8 +238,8 @@ export default function StudentProfilePage() {
                           <p className="font-bold text-lg">{course.score}%</p>
                           <p className="text-sm text-muted-foreground">Score</p>
                         </div>
-                        <Badge className={getGradeColor(course.grade)}>
-                          {course.grade}
+                        <Badge className={course.grade ? getGradeColor(course.grade) : ''}>
+                          {course.grade || 'N/A'}
                         </Badge>
                       </div>
                     </div>
@@ -245,8 +270,8 @@ export default function StudentProfilePage() {
                           </p>
                         </div>
                       </div>
-                      <p className={`font-bold text-lg ${getAttendanceColor(record.percentage)}`}>
-                        {record.percentage.toFixed(1)}%
+                      <p className={`font-bold text-lg ${record.percentage ? getAttendanceColor(record.percentage) : ''}`}>
+                        {record.percentage ? record.percentage.toFixed(1) : '0.0'}%
                       </p>
                     </div>
                   ))}

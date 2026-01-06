@@ -9,16 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { MessageSquare, Send, Inbox, Archive, Search } from "lucide-react";
-
-interface Message {
-  id: string;
-  senderName: string;
-  senderRole: string;
-  subject: string;
-  body: string;
-  read: boolean;
-  sentAt: string;
-}
+import { useEffect } from "react";
+import { useApi } from "@/hooks/use-api";
+import { messageService } from "@/lib/services";
+import { Message } from "@/lib/types";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function StudentMessagesPage() {
   const [activeTab, setActiveTab] = useState<"inbox" | "sent">("inbox");
@@ -26,56 +21,18 @@ export default function StudentMessagesPage() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const inboxMessages: Message[] = [
-    {
-      id: "1",
-      senderName: "Dr. Michael Anderson",
-      senderRole: "Lecturer",
-      subject: "Assignment Feedback - Data Structures",
-      body: "Your assignment submission was excellent. Keep up the good work!",
-      read: false,
-      sentAt: "2026-01-01T10:30:00",
-    },
-    {
-      id: "2",
-      senderName: "Admin Office",
-      senderRole: "Admin",
-      subject: "Payment Reminder",
-      body: "This is a reminder that your school fees payment is due on January 15, 2026.",
-      read: false,
-      sentAt: "2025-12-30T14:00:00",
-    },
-    {
-      id: "3",
-      senderName: "Prof. Sarah Thompson",
-      senderRole: "Lecturer",
-      subject: "Class Rescheduled",
-      body: "Tomorrow's class has been rescheduled to 2:00 PM due to a departmental meeting.",
-      read: true,
-      sentAt: "2025-12-28T16:45:00",
-    },
-    {
-      id: "4",
-      senderName: "HOD Computer Science",
-      senderRole: "HOD",
-      subject: "Industrial Training Information",
-      body: "All 400 level students are required to attend the IT briefing on January 10th.",
-      read: true,
-      sentAt: "2025-12-25T09:00:00",
-    },
-  ];
+  const { user } = useAuthStore();
+  const { data: messagesData, isLoading, execute } = useApi<{ messages: Message[]; total: number }>();
 
-  const sentMessages: Message[] = [
-    {
-      id: "5",
-      senderName: "You",
-      senderRole: "Student",
-      subject: "Request for Assignment Extension",
-      body: "Dear Dr. Anderson, I would like to request an extension for the Data Structures assignment.",
-      read: true,
-      sentAt: "2025-12-27T11:20:00",
-    },
-  ];
+  useEffect(() => {
+    execute(() => messageService.getMessages(), {
+      errorMessage: "Failed to load messages"
+    });
+  }, [execute]);
+
+  const messages = messagesData?.messages || [];
+  const inboxMessages = messages.filter(msg => msg.recipientId === user?.id);
+  const sentMessages = messages.filter(msg => msg.senderId === user?.id);
 
   const filteredInbox = inboxMessages.filter(
     (msg) =>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,67 +9,46 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Mail, Eye } from "lucide-react";
-
-interface Student {
-  id: string;
-  name: string;
-  matricNumber: string;
-  level: string;
-  department: string;
-  email: string;
-  phone: string;
-  cgpa: number;
-}
+import { useApi } from "@/hooks/use-api";
+import { lecturerService, StudentProfile } from "@/lib/services/lecturerService";
+import { Course } from "@/lib/types";
 
 export default function LecturerStudentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCourse, setSelectedCourse] = useState("all");
+  
+  const { data: students, isLoading, execute } = useApi<StudentProfile[]>();
+  const { data: courses, execute: executeCourses } = useApi<Course[]>();
 
-  const students: Student[] = [
-    {
-      id: "1",
-      name: "John Doe",
-      matricNumber: "STU/2023/001",
-      level: "400",
-      department: "Computer Science",
-      email: "john.doe@university.edu",
-      phone: "+234 801 234 5678",
-      cgpa: 4.5,
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      level: "400",
-      department: "Computer Science",
-      email: "jane.smith@university.edu",
-      phone: "+234 802 345 6789",
-      cgpa: 4.7,
-    },
-    {
-      id: "3",
-      name: "Michael Johnson",
-      matricNumber: "STU/2023/005",
-      level: "300",
-      department: "Computer Science",
-      email: "michael.j@university.edu",
-      phone: "+234 803 456 7890",
-      cgpa: 4.2,
-    },
-  ];
+  useEffect(() => {
+    execute(() => lecturerService.getStudents(), {
+      errorMessage: "Failed to load students"
+    });
+  }, [execute]);
 
-  const courses = [
-    { id: "all", name: "All Courses" },
-    { id: "1", name: "CSC 401 - Data Structures" },
-    { id: "2", name: "CSC 301 - Database Systems" },
-    { id: "3", name: "CSC 201 - OOP" },
-  ];
+  useEffect(() => {
+    executeCourses(() => lecturerService.getCourses(), {
+      errorMessage: "Failed to load courses"
+    });
+  }, [executeCourses]);
 
-  const filteredStudents = students.filter(
+  const filteredStudents = students?.filter(
     (student) =>
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.matricNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) || [];
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading students...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -82,24 +61,26 @@ export default function LecturerStudentsPage() {
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or matric number..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <select
-                className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={selectedCourse}
-                onChange={(e) => setSelectedCourse(e.target.value)}
-              >
-                {courses.map((course) => (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or matric number..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </CardContent>
+
+        </Card>
+        {/* Course Filter Dropdown - ensure select and map are inside a parent */}
+        <Card>
+          <CardContent>
+            <div>
+              <select>
+                {(courses || []).map((course) => (
                   <option key={course.id} value={course.id}>
-                    {course.name}
+                    {course.title}
                   </option>
                 ))}
               </select>

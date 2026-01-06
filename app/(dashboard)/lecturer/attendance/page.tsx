@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,69 +8,91 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle, XCircle, Clock, Calendar } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService } from "@/lib/services/lecturerService";
 
 export default function LecturerAttendancePage() {
-  const [selectedCourse, setSelectedCourse] = useState("1");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-
-  const courses = [
-    { id: "1", code: "CSC 401", name: "Data Structures" },
-    { id: "2", code: "CSC 301", name: "Database Systems" },
-    { id: "3", code: "CSC 201", name: "OOP" },
-  ];
-
-  const attendanceRecords = [
-    {
-      id: "1",
-      studentName: "John Doe",
-      matricNumber: "STU/2023/001",
-      status: "present" as const,
-    },
-    {
-      id: "2",
-      studentName: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      status: "present" as const,
-    },
-    {
-      id: "3",
-      studentName: "Michael Johnson",
-      matricNumber: "STU/2023/005",
-      status: "absent" as const,
-    },
-    {
-      id: "4",
-      studentName: "Sarah Williams",
-      matricNumber: "STU/2023/008",
-      status: "late" as const,
-    },
-  ];
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [courses, setCourses] = useState<Array<{ id: string; code: string; name: string }>>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<Array<{ id: string; matricNumber: string; studentName: string; status: string; percentage?: number }>>([]);
+  
+  const { data: attendanceData, isLoading, execute } = useApi<{ courses: Array<{ courseCode: string; courseTitle: string; totalClasses: number; sessions: Array<{ date: string; attendees: number }> }> }>();
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "present":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "absent":
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-red-500" />;
       case "late":
-        return <Clock className="h-5 w-5 text-yellow-500" />;
+        return <Clock className="h-4 w-4 text-yellow-500" />;
       default:
-        return null;
+        return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "present":
-        return <Badge className="bg-green-500">Present</Badge>;
+        return <Badge className="bg-green-100 text-green-800">Present</Badge>;
       case "absent":
-        return <Badge variant="destructive">Absent</Badge>;
+        return <Badge className="bg-red-100 text-red-800">Absent</Badge>;
       case "late":
-        return <Badge variant="secondary">Late</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800">Late</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
     }
   };
+
+  useEffect(() => {
+    execute(() => lecturerService.getAttendance(), {
+      errorMessage: "Failed to load attendance records"
+    }).then((data) => {
+      if (data) {
+        // Extract courses from attendance data
+        const courseList = data.courses.map(course => ({
+          id: course.courseCode,
+          code: course.courseCode,
+          name: course.courseTitle
+        }));
+        setCourses(courseList);
+      }
+    });
+  }, [execute]);
+
+  // Load students when course is selected
+  useEffect(() => {
+    if (selectedCourse) {
+      lecturerService.getCourseStudents(selectedCourse).then((data) => {
+        // Transform the data to match our attendance records format
+        const studentRecords = data.students.map(student => ({
+          id: student.id,
+          matricNumber: student.matricNumber,
+          studentName: student.name,
+          status: "present" as const, // Default to present, will be updated when marking attendance
+          percentage: student.attendance
+        }));
+        setAttendanceRecords(studentRecords);
+      }).catch(() => {
+        // Fallback to empty array on error
+        setAttendanceRecords([]);
+      });
+    }
+  }, [selectedCourse]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading attendance...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

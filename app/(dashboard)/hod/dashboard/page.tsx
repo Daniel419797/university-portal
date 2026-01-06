@@ -1,57 +1,75 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, Users, BookOpen, TrendingUp, Award } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { hodService, HODDashboardStats } from "@/lib/services/hodBursaryService";
 
 export default function HODDashboardPage() {
+  const { data, isLoading, execute } = useApi<HODDashboardStats>();
+
+  useEffect(() => {
+    execute(() => hodService.getDashboard(), {
+      errorMessage: "Failed to load HOD dashboard"
+    });
+  }, [execute]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading dashboard...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!data) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-muted-foreground">No dashboard data available</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const stats = [
     {
       title: "Department Students",
-      value: "1,500",
-      change: "+8.2%",
+      value: data.departmentStats.totalStudents.toString(),
       icon: Users,
     },
     {
       title: "Active Courses",
-      value: "45",
-      change: "+3",
+      value: data.departmentStats.totalCourses.toString(),
       icon: BookOpen,
     },
     {
       title: "Faculty Members",
-      value: "28",
-      change: "+2",
+      value: data.departmentStats.totalStaff.toString(),
       icon: Users,
     },
     {
-      title: "Avg. Department CGPA",
-      value: "4.2",
-      change: "+0.15",
+      title: "Active Lecturers",
+      value: data.departmentStats.activeLecturers.toString(),
       icon: Award,
     },
   ];
 
-  const pendingApprovals = [
-    {
-      id: "1",
-      type: "Result Approval",
-      course: "CSC 401 - Data Structures",
-      lecturer: "Dr. Michael Anderson",
-      submittedAt: "2026-01-01",
-      status: "pending",
-    },
-    {
-      id: "2",
-      type: "Result Approval",
-      course: "CSC 301 - Database Systems",
-      lecturer: "Prof. Sarah Thompson",
-      submittedAt: "2025-12-30",
-      status: "pending",
-    },
-  ];
+  const totalPendingApprovals = 
+    data.pendingApprovals.results + 
+    data.pendingApprovals.clearances + 
+    data.pendingApprovals.courseRegistrations;
 
   return (
     <DashboardLayout>
@@ -73,7 +91,6 @@ export default function HODDashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className="text-xs text-green-500">{stat.change} from last semester</p>
                 </CardContent>
               </Card>
             );
@@ -88,61 +105,60 @@ export default function HODDashboardPage() {
                 <CardTitle>Pending Approvals</CardTitle>
                 <CardDescription>Items requiring your approval</CardDescription>
               </div>
-              <Badge variant="secondary">{pendingApprovals.length} pending</Badge>
+              <Badge variant="secondary">{totalPendingApprovals} pending</Badge>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {pendingApprovals.map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.course}</p>
-                    <p className="text-sm text-muted-foreground">
-                      By {item.lecturer} • {new Date(item.submittedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      Review
-                    </Button>
-                    <Button size="sm">Approve</Button>
-                  </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Result Approvals</p>
+                  <p className="text-sm text-muted-foreground">Course results awaiting approval</p>
                 </div>
-              ))}
+                <Badge variant="secondary">{data.pendingApprovals.results}</Badge>
+              </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Clearance Requests</p>
+                  <p className="text-sm text-muted-foreground">Student clearance requests</p>
+                </div>
+                <Badge variant="secondary">{data.pendingApprovals.clearances}</Badge>
+              </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Course Registrations</p>
+                  <p className="text-sm text-muted-foreground">Pending course registrations</p>
+                </div>
+                <Badge variant="secondary">{data.pendingApprovals.courseRegistrations}</Badge>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Department Performance */}
+        {/* Recent Activities */}
         <Card>
           <CardHeader>
-            <CardTitle>Department Performance</CardTitle>
-            <CardDescription>Student performance by level</CardDescription>
+            <CardTitle>Recent Activities</CardTitle>
+            <CardDescription>Recent department activities</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { level: "100", students: 450, avgCGPA: 3.8 },
-                { level: "200", students: 420, avgCGPA: 4.0 },
-                { level: "300", students: 380, avgCGPA: 4.2 },
-                { level: "400", students: 250, avgCGPA: 4.5 },
-              ].map((level) => (
-                <div key={level.level}>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="font-medium">Level {level.level}</span>
-                    <span className="text-muted-foreground">
-                      {level.students} students • {level.avgCGPA} CGPA
-                    </span>
+            {data.recentActivities.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No recent activities</p>
+            ) : (
+              <div className="space-y-3">
+                {data.recentActivities.map((activity) => (
+                  <div key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">{activity.description}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {activity.user} • {new Date(activity.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{activity.type}</Badge>
                   </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full"
-                      style={{ width: `${(level.avgCGPA / 5) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

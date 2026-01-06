@@ -6,33 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Download, Printer, CheckCircle } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services/studentService";
+import { PaymentReceipt } from "@/lib/types";
 
 export default function ReceiptPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const receiptId = params?.id;
+  const receiptId = params?.id as string;
   const shouldDownload = searchParams?.get("download") === "true";
 
-  // Mock receipt data
-  const receipt = {
-    id: receiptId,
-    receiptNumber: "UNIP/2025/TF/001234",
-    studentName: "John Doe",
-    matricNumber: "STU/2023/001",
-    department: "Computer Science",
-    level: "400",
-    paymentType: "Tuition Fees",
-    amount: 150000,
-    processingFee: 100,
-    total: 150100,
-    date: "2025-12-15",
-    session: "2025/2026",
-    paymentMethod: "Debit Card",
-    transactionId: "TXN123456789",
-    status: "verified",
-    verifiedBy: "Mrs. Sarah Johnson",
-    verifiedDate: "2025-12-15",
-  };
+  const { data: receipt, isLoading, execute } = useApi<PaymentReceipt>();
+
+  useEffect(() => {
+    if (receiptId) {
+      execute(() => studentService.getPaymentReceipt(receiptId), {
+        errorMessage: "Failed to load receipt"
+      });
+    }
+  }, [execute, receiptId]);
 
   useEffect(() => {
     if (shouldDownload) {
@@ -43,6 +35,29 @@ export default function ReceiptPage() {
   const handlePrint = () => {
     window.print();
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading receipt...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!receipt) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Receipt not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -156,11 +171,11 @@ export default function ReceiptPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Processing Fee:</span>
-                  <span className="font-medium">₦{receipt.processingFee.toLocaleString()}</span>
+                  <span className="font-medium">₦{(receipt.processingFee || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-3 border-t">
                   <span>Total Amount Paid:</span>
-                  <span>₦{receipt.total.toLocaleString()}</span>
+                  <span>₦{(receipt.total || receipt.amount).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -175,7 +190,7 @@ export default function ReceiptPage() {
                   </p>
                   <p className="text-sm text-green-700 dark:text-green-300">
                     Verified by {receipt.verifiedBy} on{" "}
-                    {new Date(receipt.verifiedDate).toLocaleDateString()}
+                    {receipt.verifiedDate ? new Date(receipt.verifiedDate).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
               </div>

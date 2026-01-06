@@ -1,52 +1,37 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Users, Calendar, Plus } from "lucide-react";
 import Link from "next/link";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService } from "@/lib/services/lecturerService";
+import { Course } from "@/lib/types";
 
 export default function LecturerCoursesPage() {
-  const courses = [
-    {
-      id: "1",
-      code: "CSC 401",
-      title: "Data Structures and Algorithms",
-      level: "400",
-      semester: "first",
-      enrolled: 45,
-      capacity: 60,
-      schedule: [
-        { day: "Monday", time: "10:00 - 12:00", venue: "LT1" },
-        { day: "Wednesday", time: "14:00 - 16:00", venue: "Lab 3" },
-      ],
-    },
-    {
-      id: "2",
-      code: "CSC 301",
-      title: "Database Management Systems",
-      level: "300",
-      semester: "first",
-      enrolled: 52,
-      capacity: 60,
-      schedule: [
-        { day: "Tuesday", time: "10:00 - 12:00", venue: "LT2" },
-      ],
-    },
-    {
-      id: "3",
-      code: "CSC 201",
-      title: "Object-Oriented Programming",
-      level: "200",
-      semester: "first",
-      enrolled: 58,
-      capacity: 60,
-      schedule: [
-        { day: "Monday", time: "14:00 - 17:00", venue: "Lab 2" },
-      ],
-    },
-  ];
+  const { data: courses, isLoading, execute } = useApi<Course[]>();
+
+  useEffect(() => {
+    execute(() => lecturerService.getCourses(), {
+      errorMessage: "Failed to load courses"
+    });
+  }, [execute]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading courses...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -63,57 +48,50 @@ export default function LecturerCoursesPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <Card key={course.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle>{course.code}</CardTitle>
-                    <CardDescription>{course.title}</CardDescription>
-                  </div>
-                  <Badge variant="outline">Level {course.level}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <Users className="h-4 w-4" />
-                    Students
-                  </span>
-                  <span className="font-medium">
-                    {course.enrolled}/{course.capacity}
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    Schedule
-                  </span>
-                  {course.schedule.map((s, idx) => (
-                    <div key={idx} className="text-sm pl-6">
-                      <span className="font-medium">{s.day}</span> - {s.time}
-                      <br />
-                      <span className="text-muted-foreground">{s.venue}</span>
+          {!courses || courses.length === 0 ? (
+            <div className="col-span-3 text-center py-12">
+              <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No courses assigned</p>
+            </div>
+          ) : (
+            courses.map((course) => (
+              <Card key={course.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle>{course.code}</CardTitle>
+                      <CardDescription>{course.title}</CardDescription>
                     </div>
-                  ))}
-                </div>
+                    <Badge variant="outline">Level {course.level}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      Students
+                    </span>
+                    <span className="font-medium">
+                      {course.enrolled || 0}
+                    </span>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/lecturer/courses/${course.id}/students`}>
-                      View Students
-                    </Link>
-                  </Button>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/student/courses/${course.id}/materials`}>
-                      Materials
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/lecturer/courses/${course.id}/students`}>
+                        View Students
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/student/courses/${course.id}/materials`}>
+                        Materials
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     </DashboardLayout>

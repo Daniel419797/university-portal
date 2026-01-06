@@ -5,35 +5,51 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { CheckCircle, XCircle, Download, Receipt, User, Calendar, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { bursaryService } from "@/lib/services/hodBursaryService";
+import { Payment } from "@/lib/types";
 
 export default function PaymentDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const paymentId = params?.id;
+  const paymentId = params?.id as string;
 
-  const payment = {
-    id: paymentId,
-    studentName: "John Doe",
-    matricNumber: "STU/2023/001",
-    email: "john.doe@university.edu",
-    phone: "+234 123 456 7890",
-    department: "Computer Science",
-    level: "400",
-    amount: 150000,
-    type: "Tuition",
-    reference: "PAY/2026/001234",
-    bankReference: "FLW-123456789",
-    paymentMethod: "Bank Transfer",
-    bank: "First Bank Nigeria",
-    date: "2026-01-01T10:30:00",
-    status: "pending",
-    proofOfPayment: "receipt_001234.pdf",
-    session: "2025/2026",
-    semester: "First Semester",
-  };
+  const { data: payment, isLoading, execute } = useApi<Payment>();
+
+  useEffect(() => {
+    if (paymentId) {
+      execute(() => bursaryService.getPaymentDetails(paymentId), {
+        errorMessage: "Failed to load payment details"
+      });
+    }
+  }, [execute, paymentId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading payment...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!payment) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Payment not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const handleVerify = () => {
     toast({

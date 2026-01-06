@@ -8,8 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle, Upload, FileText, X, CheckCircle } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services";
+import { fileService } from "@/lib/services";
+import { type Assignment } from "@/lib/types";
 
 export default function SubmitAssignmentPage() {
   const params = useParams();
@@ -17,21 +21,21 @@ export default function SubmitAssignmentPage() {
   const assignmentId = params?.id;
   const { toast } = useToast();
 
+  const { data: assignment, isLoading, execute } = useApi<Assignment>();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [comments, setComments] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const allowedFormats = [".zip", ".rar", ".7z", ".pdf", ".docx"];
+  const maxSizeMb = 50;
 
-  const assignment = {
-    id: assignmentId,
-    title: "Search Algorithms Implementation",
-    course: "CSC 401 - Artificial Intelligence",
-    dueDate: "2025-12-05T23:59:00",
-    totalMarks: 100,
-    maxFileSize: 10, // MB
-    allowedFormats: [".zip", ".rar", ".7z"],
-  };
+  useEffect(() => {
+    if (!assignmentId) return;
+    execute(() => studentService.getAssignmentDetails(String(assignmentId)), {
+      errorMessage: "Failed to load assignment",
+    });
+  }, [assignmentId, execute]);
 
-  const isOverdue = new Date(assignment.dueDate) < new Date();
+  const isOverdue = assignment?.dueDate ? new Date(assignment.dueDate) < new Date() : false;
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,10 +43,10 @@ export default function SubmitAssignmentPage() {
 
     // Check file size
     const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > assignment.maxFileSize) {
+    if (fileSizeMB > maxSizeMb) {
       toast({
         title: "File Too Large",
-        description: `File size must not exceed ${assignment.maxFileSize} MB`,
+        description: `File size must not exceed ${maxSizeMb} MB`,
         variant: "destructive",
       });
       return;
@@ -50,10 +54,10 @@ export default function SubmitAssignmentPage() {
 
     // Check file format
     const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (!assignment.allowedFormats.includes(fileExtension)) {
+    if (!allowedFormats.includes(fileExtension)) {
       toast({
         title: "Invalid File Format",
-        description: `Only ${assignment.allowedFormats.join(", ")} files are allowed`,
+        description: `Only ${allowedFormats.join(", ")} files are allowed`,
         variant: "destructive",
       });
       return;
@@ -80,18 +84,31 @@ export default function SubmitAssignmentPage() {
 
     setIsSubmitting(true);
 
-    // Simulate file upload
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const base64 = await fileService.fileToBase64(selectedFile);
+      const uploaded = await fileService.uploadFile({ file: base64, type: "assignment" });
+
+      await studentService.submitAssignment(String(assignmentId), {
+        files: [uploaded.url],
+        comment: comments,
+      });
+
       toast({
         title: "Assignment Submitted",
         description: "Your assignment has been submitted successfully!",
         variant: "success",
       });
 
-      // Redirect to submission view
       router.push(`/student/assignments/${assignmentId}/submission`);
-    }, 2000);
+    } catch (error) {
+      toast({
+        title: "Submission Failed",
+        description: "Could not submit assignment. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -105,7 +122,7 @@ export default function SubmitAssignmentPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold">Submit Assignment</h1>
-          <p className="text-muted-foreground">{assignment.title}</p>
+          <p className="text-muted-foreground">{assignment?.title}</p>
         </div>
 
         {/* Assignment Info */}
@@ -117,22 +134,24 @@ export default function SubmitAssignmentPage() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Course</p>
-                <p className="font-medium">{assignment.course}</p>
+                <p className="font-medium">{assignment?.courseName}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Total Marks</p>
-                <p className="font-medium">{assignment.totalMarks}</p>
+                <p className="font-medium">{assignment?.totalMarks}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Due Date</p>
                 <p className="font-medium">
-                  {new Date(assignment.dueDate).toLocaleString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "numeric",
-                  })}
+                  {assignment?.dueDate
+                    ? new Date(assignment.dueDate).toLocaleString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "numeric",
+                      })
+                    : ""}
                 </p>
               </div>
               <div>
@@ -165,8 +184,7 @@ export default function SubmitAssignmentPage() {
             <CardHeader>
               <CardTitle>Upload Your Submission</CardTitle>
               <CardDescription>
-                Maximum file size: {assignment.maxFileSize} MB • Allowed formats:{" "}
-                {assignment.allowedFormats.join(", ")}
+                Maximum file size: {maxSizeMb} MB • Allowed formats: {allowedFormats.join(", ")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -178,12 +196,12 @@ export default function SubmitAssignmentPage() {
                     <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <p className="text-sm font-medium mb-1">Click to upload or drag and drop</p>
                     <p className="text-xs text-muted-foreground mb-4">
-                      {assignment.allowedFormats.join(", ")} (Max {assignment.maxFileSize} MB)
+                      {allowedFormats.join(", ")} (Max {maxSizeMb} MB)
                     </p>
                     <input
                       type="file"
                       id="file"
-                      accept={assignment.allowedFormats.join(",")}
+                      accept={allowedFormats.join(",")}
                       onChange={handleFileSelect}
                       className="hidden"
                     />
@@ -286,7 +304,7 @@ export default function SubmitAssignmentPage() {
               type="submit"
               className="flex-1"
               size="lg"
-              disabled={!selectedFile || isSubmitting}
+              disabled={!selectedFile || isSubmitting || isLoading}
             >
               {isSubmitting ? (
                 <>

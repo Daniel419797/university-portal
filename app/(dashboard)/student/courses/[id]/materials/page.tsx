@@ -8,180 +8,65 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Download, Video, Search, Folder, File, ExternalLink } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services/studentService";
+import { CourseMaterial } from "@/lib/types";
 
 export default function CourseMaterialsPage() {
   const params = useParams();
-  const courseId = params?.id;
+  const courseId = params?.id as string;
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
+  const { data: materials, isLoading, execute } = useApi<CourseMaterial[]>();
+
+  useEffect(() => {
+    if (courseId) {
+      execute(() => studentService.getCourseMaterials(courseId), {
+        errorMessage: "Failed to load course materials"
+      });
+    }
+  }, [execute, courseId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading materials...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!materials) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Course materials not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Categorize materials
+  const categorizedMaterials = {
+    lectures: materials.filter(m => m.type === 'slides' || m.type === 'document'),
+    videos: materials.filter(m => m.type === 'video'),
+    assignments: materials.filter(m => m.title.toLowerCase().includes('assignment')),
+    resources: materials.filter(m => m.type === 'pdf' || m.type === 'document'),
+  };
+
+  // Mock course info - in real app, this should come from API
   const course = {
     code: "CSC 401",
     title: "Artificial Intelligence",
-    lecturer: "Dr. Michael Chen",
+    lecturer: "Dr. Michael Anderson"
   };
-
-  const materials = {
-    lectures: [
-      {
-        id: 1,
-        title: "Week 1 - Introduction to AI",
-        type: "pdf",
-        size: "1.2 MB",
-        date: "2025-11-05",
-      },
-      {
-        id: 2,
-        title: "Week 2 - Search Algorithms",
-        type: "pptx",
-        size: "3.5 MB",
-        date: "2025-11-12",
-      },
-      {
-        id: 3,
-        title: "Week 3 - Knowledge Representation",
-        type: "pdf",
-        size: "2.1 MB",
-        date: "2025-11-19",
-      },
-      {
-        id: 4,
-        title: "Week 4 - Machine Learning Basics",
-        type: "pdf",
-        size: "1.8 MB",
-        date: "2025-11-26",
-      },
-      {
-        id: 5,
-        title: "Week 5 - Neural Networks",
-        type: "pptx",
-        size: "4.2 MB",
-        date: "2025-12-03",
-      },
-    ],
-    videos: [
-      {
-        id: 1,
-        title: "Lecture Recording - Introduction to AI",
-        duration: "1:45:30",
-        size: "125 MB",
-        date: "2025-11-05",
-      },
-      {
-        id: 2,
-        title: "Tutorial - Implementing A* Search",
-        duration: "0:35:20",
-        size: "45 MB",
-        date: "2025-11-12",
-      },
-      {
-        id: 3,
-        title: "Lecture Recording - Neural Networks Deep Dive",
-        duration: "2:10:15",
-        size: "180 MB",
-        date: "2025-12-03",
-      },
-      {
-        id: 4,
-        title: "Python for AI - Practical Session",
-        duration: "1:20:45",
-        size: "95 MB",
-        date: "2025-12-10",
-      },
-    ],
-    textbooks: [
-      {
-        id: 1,
-        title: "Artificial Intelligence: A Modern Approach",
-        author: "Russell & Norvig",
-        edition: "4th Edition",
-        type: "pdf",
-        size: "25 MB",
-      },
-      {
-        id: 2,
-        title: "Deep Learning",
-        author: "Ian Goodfellow",
-        edition: "1st Edition",
-        type: "pdf",
-        size: "18 MB",
-      },
-      {
-        id: 3,
-        title: "Pattern Recognition and Machine Learning",
-        author: "Christopher Bishop",
-        edition: "1st Edition",
-        type: "pdf",
-        size: "22 MB",
-      },
-    ],
-    assignments: [
-      {
-        id: 1,
-        title: "Assignment 1 - Search Algorithms",
-        dueDate: "2025-12-05",
-        type: "pdf",
-        size: "450 KB",
-      },
-      {
-        id: 2,
-        title: "Assignment 2 - Knowledge Representation",
-        dueDate: "2025-12-19",
-        type: "pdf",
-        size: "520 KB",
-      },
-      {
-        id: 3,
-        title: "Project Guidelines",
-        dueDate: "2026-01-15",
-        type: "pdf",
-        size: "680 KB",
-      },
-    ],
-    supplementary: [
-      {
-        id: 1,
-        title: "Python AI Libraries Cheatsheet",
-        type: "pdf",
-        size: "350 KB",
-      },
-      {
-        id: 2,
-        title: "Additional Reading - Ethics in AI",
-        type: "pdf",
-        size: "1.1 MB",
-      },
-      {
-        id: 3,
-        title: "Sample Code - Neural Network Implementation",
-        type: "zip",
-        size: "2.5 MB",
-      },
-    ],
-  };
-
-  const externalLinks = [
-    {
-      id: 1,
-      title: "TensorFlow Documentation",
-      url: "https://tensorflow.org",
-      description: "Official TensorFlow documentation and tutorials",
-    },
-    {
-      id: 2,
-      title: "PyTorch Tutorials",
-      url: "https://pytorch.org/tutorials",
-      description: "Learn PyTorch through practical examples",
-    },
-    {
-      id: 3,
-      title: "Kaggle Datasets",
-      url: "https://kaggle.com/datasets",
-      description: "Practice with real-world datasets",
-    },
-  ];
 
   const handleDownload = (fileName: string) => {
     toast({
@@ -247,7 +132,7 @@ export default function CourseMaterialsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Lecture Notes & Slides</CardTitle>
-                    <CardDescription>{materials.lectures.length} files available</CardDescription>
+                    <CardDescription>{categorizedMaterials.lectures.length} files available</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => handleDownloadAll("lectures")}>
                     <Download className="mr-2 h-3 w-3" />
@@ -257,7 +142,7 @@ export default function CourseMaterialsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {materials.lectures.map((lecture) => (
+                  {categorizedMaterials.lectures.map((lecture) => (
                     <div
                       key={lecture.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -269,7 +154,7 @@ export default function CourseMaterialsPage() {
                         <div>
                           <p className="font-medium">{lecture.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            {lecture.size} • {new Date(lecture.date).toLocaleDateString()}
+                            {lecture.size || 'N/A'} • {new Date(lecture.uploadedAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -296,7 +181,7 @@ export default function CourseMaterialsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Video Lectures & Tutorials</CardTitle>
-                    <CardDescription>{materials.videos.length} videos available</CardDescription>
+                    <CardDescription>{categorizedMaterials.videos.length} videos available</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => handleDownloadAll("videos")}>
                     <Download className="mr-2 h-3 w-3" />
@@ -306,7 +191,7 @@ export default function CourseMaterialsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {materials.videos.map((video) => (
+                  {categorizedMaterials.videos.map((video) => (
                     <div
                       key={video.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -318,7 +203,7 @@ export default function CourseMaterialsPage() {
                         <div>
                           <p className="font-medium">{video.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            {video.duration} • {video.size} • {new Date(video.date).toLocaleDateString()}
+                            {video.size || 'N/A'} • {new Date(video.uploadedAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -344,12 +229,12 @@ export default function CourseMaterialsPage() {
           <TabsContent value="textbooks" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Recommended Textbooks</CardTitle>
-                <CardDescription>{materials.textbooks.length} books available</CardDescription>
+                <CardTitle>Reference Materials</CardTitle>
+                <CardDescription>{categorizedMaterials.resources.length} reference materials available</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {materials.textbooks.map((book) => (
+                  {categorizedMaterials.resources.slice(0, 3).map((book) => (
                     <div
                       key={book.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -361,7 +246,7 @@ export default function CourseMaterialsPage() {
                         <div>
                           <p className="font-medium">{book.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            {book.author} • {book.edition} • {book.size}
+                            {book.size || 'N/A'} • {new Date(book.uploadedAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -383,12 +268,12 @@ export default function CourseMaterialsPage() {
           <TabsContent value="assignments" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Assignment Briefs</CardTitle>
-                <CardDescription>{materials.assignments.length} assignments available</CardDescription>
+                <CardTitle>Assignment Materials</CardTitle>
+                <CardDescription>{categorizedMaterials.assignments.length} assignment materials available</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {materials.assignments.map((assignment) => (
+                  {categorizedMaterials.assignments.map((assignment) => (
                     <div
                       key={assignment.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -400,7 +285,7 @@ export default function CourseMaterialsPage() {
                         <div>
                           <p className="font-medium">{assignment.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            Due: {new Date(assignment.dueDate).toLocaleDateString()} • {assignment.size}
+                            {assignment.size || 'N/A'} • {new Date(assignment.uploadedAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -422,12 +307,12 @@ export default function CourseMaterialsPage() {
           <TabsContent value="supplementary" className="space-y-4 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Supplementary Materials</CardTitle>
-                <CardDescription>Additional resources and references</CardDescription>
+                <CardTitle>Additional Resources</CardTitle>
+                <CardDescription>Supplementary materials and references</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {materials.supplementary.map((item) => (
+                  {categorizedMaterials.resources.slice(3).map((item) => (
                     <div
                       key={item.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -438,42 +323,12 @@ export default function CourseMaterialsPage() {
                         </div>
                         <div>
                           <p className="font-medium">{item.title}</p>
-                          <p className="text-sm text-muted-foreground">{item.size}</p>
+                          <p className="text-sm text-muted-foreground">{item.size || 'N/A'}</p>
                         </div>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => handleDownload(item.title)}>
                         <Download className="mr-2 h-3 w-3" />
                         Download
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>External Resources</CardTitle>
-                <CardDescription>Useful links and references</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {externalLinks.map((link) => (
-                    <div
-                      key={link.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <ExternalLink className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{link.title}</p>
-                          <p className="text-sm text-muted-foreground">{link.description}</p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={link.url} target="_blank" rel="noopener noreferrer">
-                          Visit
-                        </a>
                       </Button>
                     </div>
                   ))}

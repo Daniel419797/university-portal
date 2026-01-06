@@ -1,45 +1,31 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, BookOpen, Users, FileText } from "lucide-react";
 import Link from "next/link";
+import { useApi } from "@/hooks/use-api";
+import { adminService } from "@/lib/services";
 
 export default function AdminCoursesPage() {
-  const courses = [
-    {
-      id: "1",
-      code: "CSC 401",
-      title: "Data Structures and Algorithms",
-      department: "Computer Science",
-      level: "400",
-      semester: "first",
-      credits: 3,
-      lecturer: "Dr. Michael Anderson",
-      enrolled: 45,
-      capacity: 60,
-    },
-    {
-      id: "2",
-      code: "CSC 301",
-      title: "Database Management Systems",
-      department: "Computer Science",
-      level: "300",
-      semester: "first",
-      credits: 3,
-      lecturer: "Prof. Sarah Thompson",
-      enrolled: 52,
-      capacity: 60,
-    },
-  ];
+  const { data: courses, isLoading, execute } = useApi<Array<{ id: string; code: string; title: string; credits: number; level: string; semester: string; department: string; lecturerName: string; enrolledStudents: number }>>();
+
+  useEffect(() => {
+    execute(() => adminService.getCourses(), {
+      errorMessage: "Failed to load courses",
+    });
+  }, [execute]);
+
+  const totalEnrollment = courses?.reduce((sum, c) => sum + (c.enrolledStudents || 0), 0) || 0;
 
   const stats = [
-    { title: "Total Courses", value: "250", icon: BookOpen },
-    { title: "Active Courses", value: "180", icon: BookOpen },
-    { title: "Total Enrollment", value: "8,450", icon: Users },
-    { title: "Course Materials", value: "1,250", icon: FileText },
+    { title: "Total Courses", value: String(courses?.length || 0), icon: BookOpen },
+    { title: "Active Courses", value: String(courses?.length || 0), icon: BookOpen },
+    { title: "Total Enrollment", value: String(totalEnrollment), icon: Users },
+    { title: "Course Materials", value: "N/A", icon: FileText },
   ];
 
   return (
@@ -78,7 +64,7 @@ export default function AdminCoursesPage() {
 
         {/* Courses List */}
         <div className="grid gap-4 md:grid-cols-2">
-          {courses.map((course) => (
+          {courses?.map((course) => (
             <Card key={course.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -101,12 +87,12 @@ export default function AdminCoursesPage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Lecturer:</span>
-                    <p className="font-medium">{course.lecturer}</p>
+                    <p className="font-medium">{course.lecturerName}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Enrollment:</span>
                     <p className="font-medium">
-                      {course.enrolled}/{course.capacity}
+                      {course.enrolledStudents}
                     </p>
                   </div>
                 </div>

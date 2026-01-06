@@ -1,56 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Edit, Trash2, UserPlus } from "lucide-react";
+import { Search, Edit, Trash2, UserPlus } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { adminService } from "@/lib/services";
 
 export default function AdminUsersPage() {
+  type User = { id: string; name: string; email: string; role: string; department?: string; status: string; createdAt: string; matricNumber?: string; level?: string };
+
   const [searchQuery, setSearchQuery] = useState("");
+  const selectedRole = "all";
+  const { data: users, isLoading, execute } = useApi<User[]>();
 
-  const students = [
-    {
-      id: "1",
-      name: "John Doe",
-      email: "john.doe@university.edu",
-      matricNumber: "STU/2023/001",
-      department: "Computer Science",
-      level: "400",
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      email: "jane.smith@university.edu",
-      matricNumber: "STU/2023/002",
-      department: "Computer Science",
-      level: "400",
-      status: "active",
-    },
-  ];
+  useEffect(() => {
+    execute(() => adminService.getUsers({ search: searchQuery, role: selectedRole === "all" ? undefined : selectedRole }), {
+      errorMessage: "Failed to load users",
+    });
+  }, [execute, searchQuery, selectedRole]);
 
-  const lecturers = [
-    {
-      id: "1",
-      name: "Dr. Michael Anderson",
-      email: "anderson@university.edu",
-      department: "Computer Science",
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Prof. Sarah Thompson",
-      email: "thompson@university.edu",
-      department: "Computer Science",
-      status: "active",
-    },
-  ];
+  const nestedUsers = (users as unknown as { users?: User[] })?.users;
+  const userList: User[] = Array.isArray(users) ? users : (Array.isArray(nestedUsers) ? nestedUsers : []);
+
+  const students = userList.filter((u: User) => u.role === "student");
+  const lecturers = userList.filter((u: User) => u.role === "lecturer");
 
   return (
     <DashboardLayout>
@@ -115,14 +95,24 @@ export default function AdminUsersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {isLoading && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">Loading users...</TableCell>
+                      </TableRow>
+                    )}
+                    {!isLoading && userList.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">No users found.</TableCell>
+                      </TableRow>
+                    )}
                     {students.map((student) => (
                       <TableRow key={student.id}>
-                        <TableCell className="font-mono">{student.matricNumber}</TableCell>
+                        <TableCell className="font-mono">{student.matricNumber || "N/A"}</TableCell>
                         <TableCell className="font-medium">{student.name}</TableCell>
                         <TableCell>{student.email}</TableCell>
                         <TableCell>{student.department}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">Level {student.level}</Badge>
+                          <Badge variant="outline">Level {student.level || "N/A"}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge

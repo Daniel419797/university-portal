@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,12 +9,116 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { useApi } from "@/hooks/use-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
 import { Upload } from "lucide-react";
+import { userService, UserSettings } from "@/lib/services";
+import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { User } from "@/lib/types";
+
+interface ProfileFormData {
+  firstName: string;
+  lastName: string;
+  phone: string;
+}
+
+interface PasswordFormData {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const { isLoading: isLoadingProfile, execute: executeProfile } = useApi<User>();
+  const { isLoading: isLoadingPassword, execute: executePassword } = useApi<void>();
+  const { isLoading: isLoadingSettings, execute: executeSettings } = useApi<UserSettings>();
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+
+  // Profile form
+  const {
+    register: registerProfile,
+    handleSubmit: handleSubmitProfile,
+    formState: { errors: profileErrors },
+    reset: resetProfile,
+  } = useForm<ProfileFormData>({
+    defaultValues: {
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      phone: "",
+    },
+  });
+
+  // Password form
+  const {
+    register: registerPassword,
+    handleSubmit: handleSubmitPassword,
+    formState: { errors: passwordErrors },
+    reset: resetPassword,
+  } = useForm<PasswordFormData>();
+
+  // Load settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      const result = await executeSettings(
+        () => userService.getSettings(),
+        { errorMessage: "Failed to load settings" }
+      );
+      if (result) {
+        setSettings(result);
+      }
+    };
+    loadSettings();
+  }, [executeSettings]);
+
+  // Update profile
+  const onSubmitProfile = async (data: ProfileFormData) => {
+    await executeProfile(
+      () => userService.updateProfile(data),
+      {
+        successMessage: "Profile updated successfully",
+        onSuccess: (updatedUser) => {
+        setUser(updatedUser as User);
+          resetProfile(data);
+        },
+      }
+    );
+  };
+
+  // Change password
+  const onSubmitPassword = async (data: PasswordFormData) => {
+    if (data.newPassword !== data.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    await executePassword(
+      () => userService.changePassword({
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      }),
+      {
+        successMessage: "Password changed successfully",
+        onSuccess: () => resetPassword(),
+      }
+    );
+  };
+
+  // Update settings
+  const handleSettingsChange = async (key: string, value: boolean | string) => {
+    const updatedSettings = { ...settings, [key]: value } as UserSettings;
+    setSettings(updatedSettings);
+    
+    await executeSettings(
+      () => userService.updateSettings({ [key]: value }),
+      {
+        successMessage: "Settings updated",
+        errorMessage: "Failed to update settings",
+      }
+    );
+  };
 
   if (!user) return null;
 
@@ -40,51 +145,77 @@ export default function SettingsPage() {
                 <CardTitle>Profile Information</CardTitle>
                 <CardDescription>Update your profile information</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={user.avatar} alt={user.firstName} />
-                    <AvatarFallback className="text-lg">
-                      {getInitials(`${user.firstName} ${user.lastName}`)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button variant="outline">
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Photo
+              <CardContent>
+                <form onSubmit={handleSubmitProfile(onSubmitProfile)} className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={user.avatar} alt={user.firstName} />
+                      <AvatarFallback className="text-lg">
+                        {getInitials(`${user.firstName} ${user.lastName}`)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Button type="button" variant="outline">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Photo
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input
+                        id="firstName"
+                        {...registerProfile("firstName", { required: "First name is required" })}
+                      />
+                      {profileErrors.firstName && (
+                        <p className="text-sm text-destructive mt-1">{profileErrors.firstName.message}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        {...registerProfile("lastName", { required: "Last name is required" })}
+                      />
+                      {profileErrors.lastName && (
+                        <p className="text-sm text-destructive mt-1">{profileErrors.lastName.message}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input type="email" id="email" value={user.email} disabled />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      {...registerProfile("phone")}
+                      placeholder="+234 XXX XXX XXXX"
+                    />
+                  </div>
+
+                  {user.studentId && (
+                    <div>
+                      <Label>Student/Staff ID</Label>
+                      <Input value={user.studentId} disabled />
+                    </div>
+                  )}
+
+                  {user.department && (
+                    <div>
+                      <Label>Department</Label>
+                      <Input value={user.department} disabled />
+                    </div>
+                  )}
+
+                  <Button type="submit" disabled={isLoadingProfile}>
+                    {isLoadingProfile ? "Saving..." : "Save Changes"}
                   </Button>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label>First Name</Label>
-                    <Input defaultValue={user.firstName} />
-                  </div>
-                  <div>
-                    <Label>Last Name</Label>
-                    <Input defaultValue={user.lastName} />
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Email</Label>
-                  <Input type="email" defaultValue={user.email} />
-                </div>
-
-                {user.studentId && (
-                  <div>
-                    <Label>Student/Staff ID</Label>
-                    <Input defaultValue={user.studentId} disabled />
-                  </div>
-                )}
-
-                {user.department && (
-                  <div>
-                    <Label>Department</Label>
-                    <Input defaultValue={user.department} disabled />
-                  </div>
-                )}
-
-                <Button>Save Changes</Button>
+                </form>
               </CardContent>
             </Card>
           </TabsContent>
@@ -96,20 +227,48 @@ export default function SettingsPage() {
                 <CardTitle>Password</CardTitle>
                 <CardDescription>Change your password</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Current Password</Label>
-                  <Input type="password" />
-                </div>
-                <div>
-                  <Label>New Password</Label>
-                  <Input type="password" />
-                </div>
-                <div>
-                  <Label>Confirm New Password</Label>
-                  <Input type="password" />
-                </div>
-                <Button>Update Password</Button>
+              <CardContent>
+                <form onSubmit={handleSubmitPassword(onSubmitPassword)} className="space-y-4">
+                  <div>
+                    <Label htmlFor="currentPassword">Current Password</Label>
+                    <Input
+                      id="currentPassword"
+                      type="password"
+                      {...registerPassword("currentPassword", { required: "Current password is required" })}
+                    />
+                    {passwordErrors.currentPassword && (
+                      <p className="text-sm text-destructive mt-1">{passwordErrors.currentPassword.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      {...registerPassword("newPassword", {
+                        required: "New password is required",
+                        minLength: { value: 8, message: "Password must be at least 8 characters" },
+                      })}
+                    />
+                    {passwordErrors.newPassword && (
+                      <p className="text-sm text-destructive mt-1">{passwordErrors.newPassword.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      {...registerPassword("confirmPassword", { required: "Please confirm your password" })}
+                    />
+                    {passwordErrors.confirmPassword && (
+                      <p className="text-sm text-destructive mt-1">{passwordErrors.confirmPassword.message}</p>
+                    )}
+                  </div>
+                  <Button type="submit" disabled={isLoadingPassword}>
+                    {isLoadingPassword ? "Updating..." : "Update Password"}
+                  </Button>
+                </form>
               </CardContent>
             </Card>
 
@@ -126,7 +285,11 @@ export default function SettingsPage() {
                       Require a verification code in addition to your password
                     </p>
                   </div>
-                  <Switch />
+                  <Switch
+                    checked={settings?.twoFactorEnabled || false}
+                    onCheckedChange={(checked) => handleSettingsChange("twoFactorEnabled", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -157,7 +320,11 @@ export default function SettingsPage() {
                       Receive updates via email
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={settings?.emailNotifications !== false}
+                    onCheckedChange={(checked) => handleSettingsChange("emailNotifications", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -166,7 +333,11 @@ export default function SettingsPage() {
                       Receive important alerts via SMS
                     </p>
                   </div>
-                  <Switch />
+                  <Switch
+                    checked={settings?.smsNotifications || false}
+                    onCheckedChange={(checked) => handleSettingsChange("smsNotifications", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -175,7 +346,11 @@ export default function SettingsPage() {
                       Receive notifications in your browser
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={settings?.pushNotifications !== false}
+                    onCheckedChange={(checked) => handleSettingsChange("pushNotifications", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -193,7 +368,11 @@ export default function SettingsPage() {
                       New assignments and deadline reminders
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={settings?.notifyAssignments !== false}
+                    onCheckedChange={(checked) => handleSettingsChange("notifyAssignments", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -202,7 +381,11 @@ export default function SettingsPage() {
                       When new results are published
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={settings?.notifyResults !== false}
+                    onCheckedChange={(checked) => handleSettingsChange("notifyResults", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -211,7 +394,11 @@ export default function SettingsPage() {
                       New messages from lecturers and administrators
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={settings?.notifyMessages !== false}
+                    onCheckedChange={(checked) => handleSettingsChange("notifyMessages", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -220,7 +407,11 @@ export default function SettingsPage() {
                       Fee payment deadlines and confirmations
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={settings?.notifyPayments !== false}
+                    onCheckedChange={(checked) => handleSettingsChange("notifyPayments", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -236,7 +427,12 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div>
                   <Label>Color Theme</Label>
-                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={settings?.theme || "system"}
+                    onChange={(e) => handleSettingsChange("theme", e.target.value)}
+                    disabled={isLoadingSettings}
+                  >
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
                     <option value="system">System</option>
@@ -258,7 +454,11 @@ export default function SettingsPage() {
                       Show more content on screen
                     </p>
                   </div>
-                  <Switch />
+                  <Switch
+                    checked={settings?.compactMode || false}
+                    onCheckedChange={(checked) => handleSettingsChange("compactMode", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
@@ -267,7 +467,11 @@ export default function SettingsPage() {
                       Enable smooth transitions and effects
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={settings?.showAnimations !== false}
+                    onCheckedChange={(checked) => handleSettingsChange("showAnimations", checked)}
+                    disabled={isLoadingSettings}
+                  />
                 </div>
               </CardContent>
             </Card>

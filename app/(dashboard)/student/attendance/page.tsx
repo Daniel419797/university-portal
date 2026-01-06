@@ -1,91 +1,32 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Calendar, Download, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useApi } from "@/hooks/use-api";
+import { studentService, AttendanceRecord } from "@/lib/services";
 
 export default function AttendancePage() {
   const currentSession = "2025/2026";
   const currentSemester = "First Semester";
 
-  const attendanceData = [
-    {
-      code: "CSC 401",
-      title: "Artificial Intelligence",
-      lecturer: "Dr. Michael Chen",
-      totalClasses: 24,
-      attended: 22,
-      percentage: 91.67,
-      status: "excellent",
-      records: [
-        { date: "2025-11-05", status: "present", topic: "Introduction to AI" },
-        { date: "2025-11-12", status: "present", topic: "Search Algorithms" },
-        { date: "2025-11-19", status: "absent", topic: "Knowledge Representation" },
-        { date: "2025-11-26", status: "present", topic: "Machine Learning Basics" },
-        { date: "2025-12-03", status: "present", topic: "Neural Networks" },
-        { date: "2025-12-10", status: "absent", topic: "Deep Learning" },
-      ],
-    },
-    {
-      code: "CSC 403",
-      title: "Compiler Construction",
-      lecturer: "Prof. Sarah Johnson",
-      totalClasses: 20,
-      attended: 19,
-      percentage: 95,
-      status: "excellent",
-      records: [
-        { date: "2025-11-06", status: "present", topic: "Lexical Analysis" },
-        { date: "2025-11-13", status: "present", topic: "Syntax Analysis" },
-        { date: "2025-11-20", status: "present", topic: "Semantic Analysis" },
-        { date: "2025-11-27", status: "present", topic: "Code Generation" },
-        { date: "2025-12-04", status: "present", topic: "Code Optimization" },
-        { date: "2025-12-11", status: "absent", topic: "Final Review" },
-      ],
-    },
-    {
-      code: "CSC 405",
-      title: "Computer Graphics",
-      lecturer: "Dr. David Williams",
-      totalClasses: 22,
-      attended: 16,
-      percentage: 72.73,
-      status: "warning",
-      records: [
-        { date: "2025-11-07", status: "present", topic: "Graphics Fundamentals" },
-        { date: "2025-11-14", status: "absent", topic: "2D Transformations" },
-        { date: "2025-11-21", status: "present", topic: "3D Transformations" },
-        { date: "2025-11-28", status: "absent", topic: "Viewing Pipeline" },
-        { date: "2025-12-05", status: "present", topic: "Lighting and Shading" },
-        { date: "2025-12-12", status: "absent", topic: "Texture Mapping" },
-      ],
-    },
-    {
-      code: "CSC 407",
-      title: "Software Project Management",
-      lecturer: "Mrs. Emily Davis",
-      totalClasses: 18,
-      attended: 12,
-      percentage: 66.67,
-      status: "critical",
-      records: [
-        { date: "2025-11-08", status: "present", topic: "Project Planning" },
-        { date: "2025-11-15", status: "absent", topic: "Risk Management" },
-        { date: "2025-11-22", status: "absent", topic: "Team Management" },
-        { date: "2025-11-29", status: "present", topic: "Quality Assurance" },
-        { date: "2025-12-06", status: "absent", topic: "Project Monitoring" },
-        { date: "2025-12-13", status: "present", topic: "Agile Methods" },
-      ],
-    },
-  ];
+  const { data: attendanceData, isLoading, execute } = useApi<{ courses: AttendanceRecord[] }>();
 
-  const totalClasses = attendanceData.reduce((sum, course) => sum + course.totalClasses, 0);
-  const totalAttended = attendanceData.reduce((sum, course) => sum + course.attended, 0);
-  const overallPercentage = ((totalAttended / totalClasses) * 100).toFixed(2);
+  useEffect(() => {
+    execute(() => studentService.getAttendance(), {
+      errorMessage: "Failed to load attendance data"
+    });
+  }, [execute]);
+
+  const courses = attendanceData?.courses || [];
+
+  const totalClasses = courses.reduce((sum, course) => sum + (course.totalClasses || 0), 0);
+  const totalAttended = courses.reduce((sum, course) => sum + (course.attended || 0), 0);
+  const overallPercentage = courses.length > 0 ? ((totalAttended / totalClasses) * 100).toFixed(2) : "0.00";
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -108,6 +49,19 @@ export default function AttendancePage() {
     if (percentage >= 70) return { text: "Warning", color: "warning" };
     return { text: "Critical", color: "critical" };
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading attendance data...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -189,96 +143,52 @@ export default function AttendancePage() {
 
         {/* Course Attendance */}
         <div className="space-y-4">
-          {attendanceData.map((course) => {
+          {courses.map((course) => {
             const status = getStatusText(course.percentage);
             return (
-              <Card key={course.code}>
+              <Card key={course.courseCode}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle>
-                        {course.code} - {course.title}
+                        {course.courseCode} - {course.courseTitle}
                       </CardTitle>
-                      <CardDescription>Lecturer: {course.lecturer}</CardDescription>
                     </div>
                     <Badge className={getStatusColor(status.color)}>{status.text}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="summary">
-                    <TabsList>
-                      <TabsTrigger value="summary">Summary</TabsTrigger>
-                      <TabsTrigger value="records">Attendance Records</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="summary" className="space-y-4 mt-4">
-                      <div className="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                          <p className="text-2xl font-bold">{course.totalClasses}</p>
-                          <p className="text-sm text-muted-foreground">Total Classes</p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-green-600">{course.attended}</p>
-                          <p className="text-sm text-muted-foreground">Attended</p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-red-600">
-                            {course.totalClasses - course.attended}
-                          </p>
-                          <p className="text-sm text-muted-foreground">Missed</p>
-                        </div>
-                      </div>
-
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4 text-center">
                       <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span>Attendance Rate</span>
-                          <span className="font-semibold">{course.percentage.toFixed(2)}%</span>
-                        </div>
-                        <Progress value={course.percentage} className="h-3" />
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {course.percentage >= 75
-                            ? "✓ Meets minimum requirement (75%)"
-                            : "✗ Below minimum requirement (75%)"}
+                        <p className="text-2xl font-bold">{course.totalClasses}</p>
+                        <p className="text-sm text-muted-foreground">Total Classes</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{course.attended}</p>
+                        <p className="text-sm text-muted-foreground">Attended</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-red-600">
+                          {course.totalClasses - course.attended}
                         </p>
+                        <p className="text-sm text-muted-foreground">Missed</p>
                       </div>
-                    </TabsContent>
+                    </div>
 
-                    <TabsContent value="records" className="mt-4">
-                      <div className="space-y-2">
-                        {course.records.map((record, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-3 border rounded-lg"
-                          >
-                            <div className="flex items-center gap-3">
-                              {record.status === "present" ? (
-                                <CheckCircle className="h-5 w-5 text-green-500" />
-                              ) : (
-                                <XCircle className="h-5 w-5 text-red-500" />
-                              )}
-                              <div>
-                                <p className="font-medium">{record.topic}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {new Date(record.date).toLocaleDateString("en-US", {
-                                    weekday: "long",
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                            <Badge
-                              variant={record.status === "present" ? "default" : "destructive"}
-                              className={record.status === "present" ? "bg-green-500" : ""}
-                            >
-                              {record.status}
-                            </Badge>
-                          </div>
-                        ))}
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Attendance Rate</span>
+                        <span className="font-semibold">{course.percentage.toFixed(2)}%</span>
                       </div>
-                    </TabsContent>
-                  </Tabs>
+                      <Progress value={course.percentage} className="h-3" />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {course.percentage >= 75
+                          ? "✓ Meets minimum requirement (75%)"
+                          : "✗ Below minimum requirement (75%)"}
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             );

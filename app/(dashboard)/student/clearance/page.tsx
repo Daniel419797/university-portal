@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,14 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle, Clock, FileCheck, Library, DollarSign, Building2 } from "lucide-react";
-
-interface ClearanceDepartment {
-  name: string;
-  status: "pending" | "approved" | "rejected" | "cleared";
-  approvedBy?: string;
-  approvedAt?: string;
-  comment?: string;
-}
+import { useApi } from "@/hooks/use-api";
+import { studentService, ClearanceStatus } from "@/lib/services";
 
 export default function StudentClearancePage() {
   const { toast } = useToast();
@@ -26,7 +20,15 @@ export default function StudentClearancePage() {
   const [selectedDocument, setSelectedDocument] = useState("");
   const [requestPurpose, setRequestPurpose] = useState("");
   const [deliveryMethod, setDeliveryMethod] = useState("email");
-  
+
+  const { data: clearanceStatus, isLoading, execute } = useApi<ClearanceStatus>();
+
+  useEffect(() => {
+    execute(() => studentService.getClearanceStatus(), {
+      errorMessage: "Failed to load clearance status"
+    });
+  }, [execute]);
+
   const handleDocumentRequest = (documentType: string) => {
     setSelectedDocument(documentType);
     setShowDocumentDialog(true);
@@ -50,45 +52,6 @@ export default function StudentClearancePage() {
     setShowDocumentDialog(false);
     setRequestPurpose("");
     setSelectedDocument("");
-  };
-
-  const clearanceStatus = {
-    session: "2025/2026",
-    overallStatus: "partial" as "pending" | "partial" | "completed",
-    appliedAt: "2025-12-20",
-    departments: [
-      {
-        name: "Library",
-        status: "approved" as const,
-        approvedBy: "Mrs. Jennifer Adams",
-        approvedAt: "2025-12-22",
-        comment: "No outstanding books. Cleared.",
-      },
-      {
-        name: "Bursary",
-        status: "approved" as const,
-        approvedBy: "Mr. David Brown",
-        approvedAt: "2025-12-23",
-        comment: "All fees paid. Cleared.",
-      },
-      {
-        name: "Department",
-        status: "pending" as const,
-        comment: "Awaiting approval from HOD",
-      },
-      {
-        name: "Hostel",
-        status: "approved" as const,
-        approvedBy: "Hostel Warden",
-        approvedAt: "2025-12-21",
-        comment: "Room inspected and approved.",
-      },
-      {
-        name: "Student Affairs",
-        status: "pending" as const,
-        comment: "Processing...",
-      },
-    ] as ClearanceDepartment[],
   };
 
   const getStatusIcon = (status: string) => {
@@ -133,6 +96,29 @@ export default function StudentClearancePage() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading clearance status...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!clearanceStatus) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Clearance status not available</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const approvedCount = clearanceStatus.departments.filter(
     (d) => d.status === "approved"
   ).length;
@@ -152,9 +138,9 @@ export default function StudentClearancePage() {
         {/* Overall Status */}
         <Card>
           <CardHeader>
-            <CardTitle>Clearance Status - {clearanceStatus.session}</CardTitle>
+            <CardTitle>Clearance Status</CardTitle>
             <CardDescription>
-              Applied on {new Date(clearanceStatus.appliedAt).toLocaleDateString()}
+              Current clearance status for graduation
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

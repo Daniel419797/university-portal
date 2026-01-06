@@ -6,41 +6,48 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, FileText, AlertCircle, Upload, CheckCircle, Clock } from "lucide-react";
 import { useParams } from "next/navigation";
+import { useEffect } from "react";
 import Link from "next/link";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services/studentService";
+import { Assignment } from "@/lib/types";
 
 export default function AssignmentDetailsPage() {
   const params = useParams();
-  const assignmentId = params?.id;
+  const assignmentId = params?.id as string;
 
-  const assignment = {
-    id: assignmentId,
-    title: "Search Algorithms Implementation",
-    course: "CSC 401 - Artificial Intelligence",
-    description:
-      "Implement and compare the performance of different search algorithms including Breadth-First Search (BFS), Depth-First Search (DFS), and A* algorithm. You should demonstrate the algorithms on a pathfinding problem and analyze their time and space complexity.",
-    instructions: [
-      "Implement BFS, DFS, and A* algorithms in Python",
-      "Create test cases with different maze configurations",
-      "Measure and compare execution time and memory usage",
-      "Include visualization of the search process",
-      "Write a report (maximum 5 pages) analyzing the results",
-    ],
-    requirements: [
-      "Source code must be well-commented",
-      "Include unit tests for each algorithm",
-      "Provide a README file with setup instructions",
-      "Submit all files in a single ZIP archive",
-      "Maximum file size: 10 MB",
-    ],
-    dueDate: "2025-12-05T23:59:00",
-    totalMarks: 100,
-    submissionFormat: "ZIP file containing code, tests, and report",
-    lecturer: "Dr. Michael Chen",
-    submissionStatus: null, // null, 'submitted', 'graded'
-    submittedDate: null,
-    grade: null,
-    feedback: null,
-  };
+  const { data: assignment, isLoading, execute } = useApi<Assignment>();
+
+  useEffect(() => {
+    if (assignmentId) {
+      execute(() => studentService.getAssignmentDetails(assignmentId), {
+        errorMessage: "Failed to load assignment details"
+      });
+    }
+  }, [execute, assignmentId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading assignment...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!assignment) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Assignment not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const isOverdue = new Date(assignment.dueDate) < new Date();
   const daysRemaining = Math.ceil((new Date(assignment.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
@@ -164,7 +171,7 @@ export default function AssignmentDetailsPage() {
           </CardHeader>
           <CardContent>
             <ol className="space-y-2 list-decimal list-inside">
-              {assignment.instructions.map((instruction, index) => (
+              {(assignment.instructions || []).map((instruction, index) => (
                 <li key={index} className="text-muted-foreground">
                   {instruction}
                 </li>
@@ -180,7 +187,7 @@ export default function AssignmentDetailsPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {assignment.requirements.map((requirement, index) => (
+              {(assignment.requirements || []).map((requirement, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <span className="text-primary">•</span>
                   <span className="text-muted-foreground">{requirement}</span>

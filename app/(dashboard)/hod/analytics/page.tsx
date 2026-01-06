@@ -1,33 +1,69 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, Award, BookOpen } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { hodService, DepartmentAnalytics } from "@/lib/services/hodBursaryService";
 
 export default function HODAnalyticsPage() {
+  const { data: analytics, isLoading, execute } = useApi<DepartmentAnalytics>();
+
+  useEffect(() => {
+    execute(() => hodService.getAnalytics(), {
+      errorMessage: "Failed to load department analytics"
+    });
+  }, [execute]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading analytics...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-muted-foreground">Analytics data not available</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const stats = [
     {
-      title: "Department Ranking",
-      value: "#3",
-      change: "+1 position",
+      title: "Average GPA",
+      value: analytics.performanceMetrics.averageGPA.toFixed(2),
+      change: `${analytics.performanceMetrics.passRate}% pass rate`,
       icon: Award,
     },
     {
-      title: "Average CGPA",
-      value: "4.2",
-      change: "+0.15",
+      title: "Excellence Rate",
+      value: `${analytics.performanceMetrics.excellenceRate}%`,
+      change: "First class students",
       icon: TrendingUp,
     },
     {
-      title: "Graduate Employment Rate",
-      value: "92%",
-      change: "+5%",
+      title: "Graduation Rate (4yr)",
+      value: `${analytics.graduationRates.fourYearRate}%`,
+      change: `${analytics.graduationRates.totalGraduates} graduates`,
       icon: Users,
     },
     {
-      title: "Research Publications",
-      value: "45",
-      change: "+12",
+      title: "Expected Graduates",
+      value: analytics.graduationRates.expectedGraduates.toString(),
+      change: "This session",
       icon: BookOpen,
     },
   ];
@@ -64,28 +100,23 @@ export default function HODAnalyticsPage() {
         {/* Performance by Level */}
         <Card>
           <CardHeader>
-            <CardTitle>Student Performance by Level</CardTitle>
-            <CardDescription>Average CGPA across all levels</CardDescription>
+            <CardTitle>Enrollment Trends</CardTitle>
+            <CardDescription>Enrollment and graduation trends</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { level: "100", cgpa: 3.8, students: 450 },
-                { level: "200", cgpa: 4.0, students: 420 },
-                { level: "300", cgpa: 4.2, students: 380 },
-                { level: "400", cgpa: 4.5, students: 250 },
-              ].map((level) => (
-                <div key={level.level}>
+              {analytics.enrollmentTrends.map((trend) => (
+                <div key={trend.period}>
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="font-medium">Level {level.level}</span>
+                    <span className="font-medium">{trend.period}</span>
                     <span className="text-muted-foreground">
-                      {level.students} students • {level.cgpa} CGPA
+                      {trend.enrollments} enrollments • {trend.graduations} graduations
                     </span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
                       className="bg-primary h-2 rounded-full"
-                      style={{ width: `${(level.cgpa / 5) * 100}%` }}
+                      style={{ width: `${(trend.enrollments / Math.max(...analytics.enrollmentTrends.map(t => t.enrollments))) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -111,13 +142,40 @@ export default function HODAnalyticsPage() {
           {/* Faculty Performance */}
           <Card>
             <CardHeader>
-              <CardTitle>Faculty Performance</CardTitle>
-              <CardDescription>Average student ratings for lecturers</CardDescription>
+              <CardTitle>Faculty Productivity</CardTitle>
+              <CardDescription>Staff performance metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {analytics.staffProductivity.map((staff) => (
+                  <div key={staff.staffId} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">{staff.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {staff.coursesAssigned} courses • {staff.studentsSupervised} students
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-600">
+                        {staff.averageStudentPerformance.toFixed(1)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Avg Performance</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Top Lecturers */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Lecturers</CardTitle>
+              <CardDescription>Highest rated lecturers this semester</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {[
-                  { name: "Dr. Anderson", rating: 4.8, courses: 3 },
                   { name: "Prof. Thompson", rating: 4.9, courses: 2 },
                   { name: "Dr. Martinez", rating: 4.6, courses: 4 },
                 ].map((lecturer) => (

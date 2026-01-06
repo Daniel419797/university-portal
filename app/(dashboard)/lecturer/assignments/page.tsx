@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,49 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, FileText, Users, Calendar } from "lucide-react";
 import Link from "next/link";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService } from "@/lib/services/lecturerService";
+import { Assignment } from "@/lib/types";
 
 export default function LecturerAssignmentsPage() {
-  const assignments = [
-    {
-      id: "1",
-      courseCode: "CSC 401",
-      courseName: "Data Structures",
-      title: "Implement Binary Search Tree",
-      dueDate: "2026-01-20",
-      totalMarks: 20,
-      submissions: 32,
-      totalStudents: 45,
-      graded: 15,
-    },
-    {
-      id: "2",
-      courseCode: "CSC 301",
-      courseName: "Database Systems",
-      title: "Design ER Diagram",
-      dueDate: "2026-01-25",
-      totalMarks: 15,
-      submissions: 45,
-      totalStudents: 52,
-      graded: 40,
-    },
-    {
-      id: "3",
-      courseCode: "CSC 201",
-      courseName: "OOP",
-      title: "Java Class Design",
-      dueDate: "2026-01-15",
-      totalMarks: 10,
-      submissions: 58,
-      totalStudents: 58,
-      graded: 58,
-    },
-  ];
+  const { data: assignments, isLoading, execute } = useApi<Assignment[]>();
 
-  const getStatusBadge = (assignment: typeof assignments[0]) => {
+  useEffect(() => {
+    execute(() => lecturerService.getAssignments(), {
+      errorMessage: "Failed to load assignments"
+    });
+  }, [execute]);
+
+  const getStatusBadge = (assignment: Assignment) => {
     const now = new Date();
     const due = new Date(assignment.dueDate);
 
-    if (assignment.graded === assignment.submissions) {
+    if (assignment.status === "graded") {
       return <Badge className="bg-green-500">All Graded</Badge>;
     } else if (now > due) {
       return <Badge variant="destructive">Overdue</Badge>;
@@ -58,6 +33,19 @@ export default function LecturerAssignmentsPage() {
       return <Badge variant="secondary">Active</Badge>;
     }
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading assignments...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -77,23 +65,23 @@ export default function LecturerAssignmentsPage() {
 
         <Tabs defaultValue="all">
           <TabsList>
-            <TabsTrigger value="all">All ({assignments.length})</TabsTrigger>
+            <TabsTrigger value="all">All ({assignments?.length || 0})</TabsTrigger>
             <TabsTrigger value="pending">
-              Pending Grading ({assignments.filter((a) => a.graded < a.submissions).length})
+              Pending Grading ({assignments?.filter((a) => (a.graded || 0) < (a.submissions || 0)).length || 0})
             </TabsTrigger>
             <TabsTrigger value="graded">
-              Graded ({assignments.filter((a) => a.graded === a.submissions).length})
+              Graded ({assignments?.filter((a) => (a.graded || 0) === (a.submissions || 0)).length || 0})
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-4">
-            {assignments.map((assignment) => (
+            {assignments?.map((assignment) => (
               <Card key={assignment.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
                       <CardTitle className="flex items-center gap-2">
-                        {assignment.courseCode} - {assignment.title}
+                        {assignment.courseId} - {assignment.title}
                         {getStatusBadge(assignment)}
                       </CardTitle>
                       <CardDescription>{assignment.courseName}</CardDescription>
@@ -117,7 +105,7 @@ export default function LecturerAssignmentsPage() {
                       <div>
                         <p className="text-muted-foreground">Submissions</p>
                         <p className="font-medium">
-                          {assignment.submissions}/{assignment.totalStudents}
+                          {assignment.submissions || 0}/{assignment.totalStudents || 0}
                         </p>
                       </div>
                     </div>
@@ -127,7 +115,7 @@ export default function LecturerAssignmentsPage() {
                       <div>
                         <p className="text-muted-foreground">Graded</p>
                         <p className="font-medium">
-                          {assignment.graded}/{assignment.submissions}
+                          {assignment.graded || 0}/{assignment.submissions || 0}
                         </p>
                       </div>
                     </div>

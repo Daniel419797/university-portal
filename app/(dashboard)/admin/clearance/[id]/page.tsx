@@ -5,68 +5,74 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { CheckCircle, XCircle, User, FileCheck, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { adminService } from "@/lib/services/adminService";
+
+interface ClearanceData {
+  student: {
+    id: string;
+    name: string;
+    matricNumber: string;
+    department: string;
+    level: string;
+    session: string;
+    email: string;
+    phone: string;
+  };
+  clearanceItems: Array<{
+    id: string;
+    department: string;
+    status: string;
+    approvedBy: string | null;
+    approvedDate: string | null;
+    comments: string | null;
+  }>;
+}
 
 export default function ClearanceDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const clearanceId = params?.id;
+  const clearanceId = params?.id as string;
 
-  const student = {
-    id: clearanceId,
-    name: "John Doe",
-    matricNumber: "STU/2023/001",
-    department: "Computer Science",
-    level: "400",
-    session: "2025/2026",
-    email: "john.doe@university.edu",
-    phone: "+234 123 456 7890",
-  };
+  const { data: clearanceData, isLoading, execute } = useApi<ClearanceData>();
 
-  const clearanceItems = [
-    {
-      id: "1",
-      department: "Library",
-      status: "approved",
-      approvedBy: "Mrs. Sarah Johnson",
-      approvedDate: "2025-12-28",
-      comments: "No outstanding books. Cleared.",
-    },
-    {
-      id: "2",
-      department: "Bursary",
-      status: "approved",
-      approvedBy: "Mr. David Chen",
-      approvedDate: "2025-12-29",
-      comments: "All fees paid. Student cleared.",
-    },
-    {
-      id: "3",
-      department: "Department",
-      status: "pending",
-      approvedBy: null,
-      approvedDate: null,
-      comments: null,
-    },
-    {
-      id: "4",
-      department: "Hostel",
-      status: "approved",
-      approvedBy: "Dr. James Wilson",
-      approvedDate: "2025-12-30",
-      comments: "Room vacated and inspected. No damages.",
-    },
-    {
-      id: "5",
-      department: "Student Affairs",
-      status: "rejected",
-      approvedBy: "Prof. Michael Anderson",
-      approvedDate: "2025-12-31",
-      comments: "Outstanding disciplinary case. Must resolve before clearance.",
-    },
-  ];
+  useEffect(() => {
+    if (clearanceId) {
+      execute(() => adminService.getClearance(clearanceId), {
+        errorMessage: "Failed to load clearance details"
+      });
+    }
+  }, [execute, clearanceId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading clearance...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!clearanceData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Clearance not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const student = clearanceData.student;
+  const clearanceItems = clearanceData.clearanceItems;
 
   const progress = clearanceItems.filter((item) => item.status === "approved").length;
   const total = clearanceItems.length;
@@ -258,7 +264,7 @@ export default function ClearanceDetailsPage() {
                   <div>
                     <h4 className="font-semibold">Clearance Complete</h4>
                     <p className="text-sm text-muted-foreground">
-                      All departments have approved this student's clearance
+                      All departments have approved this student&apos;s clearance
                     </p>
                   </div>
                 </div>

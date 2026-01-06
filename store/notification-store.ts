@@ -1,96 +1,102 @@
 import { create } from "zustand";
-import { Notification } from "@/lib/types";
+import {
+  notificationService,
+  type Notification,
+} from "@/lib/services";
 
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
-  addNotification: (notification: Omit<Notification, "id" | "createdAt">) => void;
-  markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
-  removeNotification: (id: string) => void;
+  loading: boolean;
+  error?: string;
+  fetchNotifications: () => Promise<void>;
+  fetchUnreadCount: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  removeNotification: (id: string) => Promise<void>;
   clearAll: () => void;
 }
 
-export const useNotificationStore = create<NotificationState>((set) => ({
-  notifications: [
-    {
-      id: "1",
-      userId: "1",
-      type: "info",
-      title: "New Assignment Posted",
-      message: "CSC 401 - Data Structures assignment has been posted",
-      link: "/student/assignments/1",
-      read: false,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      userId: "1",
-      type: "warning",
-      title: "Payment Reminder",
-      message: "School fees payment deadline is in 3 days",
-      link: "/student/payments",
-      read: false,
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-      id: "3",
-      userId: "1",
-      type: "success",
-      title: "Result Published",
-      message: "Your results for CSC 301 have been published",
-      link: "/student/results",
-      read: true,
-      createdAt: new Date(Date.now() - 172800000).toISOString(),
-    },
-  ],
-  unreadCount: 2,
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "Failed to load notifications";
 
-  addNotification: (notification) =>
-    set((state) => ({
-      notifications: [
-        {
-          ...notification,
-          id: Date.now().toString(),
-          createdAt: new Date().toISOString(),
-          read: false,
-        },
-        ...state.notifications,
-      ],
-      unreadCount: state.unreadCount + 1,
-    })),
+export const useNotificationStore = create<NotificationState>((set, get) => ({
+  notifications: [],
+  unreadCount: 0,
+  loading: false,
+  error: undefined,
 
-  markAsRead: (id) =>
-    set((state) => {
-      const notification = state.notifications.find((n) => n.id === id);
-      if (notification && !notification.read) {
-        return {
-          notifications: state.notifications.map((n) =>
-            n.id === id ? { ...n, read: true } : n
-          ),
-          unreadCount: Math.max(0, state.unreadCount - 1),
-        };
-      }
-      return state;
-    }),
+  fetchNotifications: async () => {
+    set({ loading: true, error: undefined });
+    try {
+      const data = await notificationService.getNotifications();
+      const list = Array.isArray(data) ? data : [];
+      const unread = list.filter((n) => !n.isRead).length;
+      set({ notifications: list, unreadCount: unread, loading: false });
+    } catch (error) {
+      set({ loading: false, error: getErrorMessage(error) });
+    }
+  },
 
-  markAllAsRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
+  fetchUnreadCount: async () => {
+    try {
+      const count = await notificationService.getUnreadCount();
+      set({ unreadCount: count });
+    } catch (error) {
+      set({ error: getErrorMessage(error) });
+    }
+  },
+
+  markAsRead: async (id) => {
+    const { notifications, unreadCount } = get();
+    const wasUnread = notifications.some((n) => n.id === id && !n.isRead);
+
+    set({
+      notifications: notifications.map((n) =>
+        n.id === id ? { ...n, isRead: true } : n
+      ),
+      unreadCount: wasUnread ? Math.max(0, unreadCount - 1) : unreadCount,
+    });
+
+    try {
+      await notificationService.markAsRead(id);
+    } catch (error) {
+      set({ notifications, unreadCount, error: getErrorMessage(error) });
+    }
+  },
+
+  markAllAsRead: async () => {
+    const { notifications } = get();
+    const unreadIds = notifications.filter((n) => !n.isRead).map((n) => n.id);
+
+    set({
+      notifications: notifications.map((n) => ({ ...n, isRead: true })),
       unreadCount: 0,
-    })),
+    });
 
-  removeNotification: (id) =>
-    set((state) => {
-      const notification = state.notifications.find((n) => n.id === id);
-      return {
-        notifications: state.notifications.filter((n) => n.id !== id),
-        unreadCount: notification && !notification.read 
-          ? Math.max(0, state.unreadCount - 1)
-          : state.unreadCount,
-      };
-    }),
+    try {
+      await Promise.all(unreadIds.map((id) => notificationService.markAsRead(id)));
+    } catch (error) {
+      set({ notifications, unreadCount: unreadIds.length, error: getErrorMessage(error) });
+    }
+  },
 
-  clearAll: () =>
-    set({ notifications: [], unreadCount: 0 }),
+  removeNotification: async (id) => {
+    const { notifications, unreadCount } = get();
+    const wasUnread = notifications.some((n) => n.id === id && !n.isRead);
+    const updated = notifications.filter((n) => n.id !== id);
+
+    set({
+      notifications: updated,
+      unreadCount: wasUnread ? Math.max(0, unreadCount - 1) : unreadCount,
+    });
+
+    try {
+      await notificationService.deleteNotification(id);
+    } catch (error) {
+      set({ notifications, unreadCount, error: getErrorMessage(error) });
+    }
+  },
+
+  clearAll: () => set({ notifications: [], unreadCount: 0 }),
 }));

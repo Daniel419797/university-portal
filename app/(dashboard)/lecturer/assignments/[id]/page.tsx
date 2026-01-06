@@ -44,32 +44,32 @@ export default function AssignmentDetailsPage() {
   const stats = [
     {
       label: "Total Students",
-      value: assignment.totalStudents,
+      value: assignment.totalStudents || 0,
       icon: Users,
       color: "text-blue-600",
     },
     {
       label: "Submitted",
-      value: assignment.submittedCount,
+      value: assignment.submittedCount || 0,
       icon: FileText,
       color: "text-green-600",
     },
     {
       label: "Graded",
-      value: assignment.gradedCount,
+      value: assignment.gradedCount || 0,
       icon: Award,
       color: "text-purple-600",
     },
     {
       label: "Pending",
-      value: assignment.pendingCount,
+      value: assignment.pendingCount || 0,
       icon: Clock,
       color: "text-yellow-600",
     },
   ];
 
-  const submissionRate = ((assignment.submittedCount / assignment.totalStudents) * 100).toFixed(0);
-  const gradingRate = ((assignment.gradedCount / assignment.submittedCount) * 100).toFixed(0);
+  const submissionRate = assignment.totalStudents ? ((assignment.submittedCount! / assignment.totalStudents) * 100).toFixed(0) : "0";
+  const gradingRate = assignment.submittedCount ? ((assignment.gradedCount! / assignment.submittedCount) * 100).toFixed(0) : "0";
 
   const handleDelete = () => {
     const confirmed = confirm("Are you sure you want to delete this assignment? This action cannot be undone.");

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,53 +8,52 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Mail, Phone, BookOpen, Award, Calendar, FileText } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { useApi } from "@/hooks/use-api";
+import { hodService } from "@/lib/services/hodBursaryService";
+import { StaffMember } from "@/lib/types";
 
 export default function StaffProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const staffId = params?.id;
+  const staffId = params?.id as string;
 
-  const staff = {
-    id: staffId,
-    name: "Dr. Michael Chen",
-    staffId: "STF/2020/045",
-    email: "michael.chen@university.edu",
-    phone: "+234 123 456 7890",
-    department: "Computer Science",
-    position: "Senior Lecturer",
-    office: "Room 204, CS Building",
-    joinDate: "2020-09-01",
-    qualifications: ["PhD in Computer Science - Stanford University", "MSc in AI - MIT", "BSc in Computer Science - University of Lagos"],
-    specialization: ["Artificial Intelligence", "Machine Learning", "Data Mining", "Neural Networks"],
-    status: "active",
-  };
+  const { data: staff, isLoading, execute } = useApi<StaffMember>();
 
-  const courses = [
-    { code: "CSC 401", name: "Artificial Intelligence", students: 42, level: "400" },
-    { code: "CSC 301", name: "Data Structures", students: 58, level: "300" },
-    { code: "CSC 501", name: "Advanced AI", students: 15, level: "500" },
-  ];
+  useEffect(() => {
+    if (staffId) {
+      execute(() => hodService.getStaffProfile(staffId), {
+        errorMessage: "Failed to load staff profile"
+      });
+    }
+  }, [execute, staffId]);
 
-  const students = [
-    { name: "John Doe", matricNumber: "CS/2022/001", level: "400", project: "AI Chatbot" },
-    { name: "Jane Smith", matricNumber: "CS/2022/002", level: "400", project: "ML Image Recognition" },
-    { name: "Michael Johnson", matricNumber: "CS/2023/015", level: "500", project: "Neural Network Optimization" },
-  ];
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading staff profile...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  const publications = [
-    {
-      title: "Deep Learning Approaches to Natural Language Processing",
-      journal: "Journal of AI Research",
-      year: 2025,
-    },
-    {
-      title: "Efficient Neural Network Architectures for Edge Devices",
-      journal: "IEEE Transactions on Neural Networks",
-      year: 2024,
-    },
-  ];
+  if (!staff) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Staff member not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  const totalStudents = courses.reduce((sum, course) => sum + course.students, 0);
+  const courses = staff.courses || [];
+  const students = staff.students || [];
+  const publications = staff.publications || [];
+  const totalStudents = courses.reduce((sum: number, course: any) => sum + (course.students || 0), 0);
 
   return (
     <DashboardLayout>
@@ -63,10 +63,10 @@ export default function StaffProfilePage() {
           <div>
             <h1 className="text-3xl font-bold">{staff.name}</h1>
             <p className="text-muted-foreground">
-              {staff.position} • {staff.department}
+              {staff.position || 'Staff'} • {staff.department || 'Department'}
             </p>
           </div>
-          <Badge className="text-lg px-4 py-1">{staff.status}</Badge>
+          <Badge className="text-lg px-4 py-1">{staff.status || 'Active'}</Badge>
         </div>
 
         {/* Quick Stats */}
@@ -139,7 +139,7 @@ export default function StaffProfilePage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Staff ID:</span>
-                  <span className="font-medium">{staff.staffId}</span>
+                  <span className="font-medium">{staff.staffId || staff.id}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Email:</span>
@@ -147,11 +147,11 @@ export default function StaffProfilePage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Phone:</span>
-                  <span className="font-medium">{staff.phone}</span>
+                  <span className="font-medium">{staff.phone || 'Not provided'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Office:</span>
-                  <span className="font-medium">{staff.office}</span>
+                  <span className="font-medium">{staff.office || 'Not assigned'}</span>
                 </div>
               </CardContent>
             </Card>
@@ -163,20 +163,20 @@ export default function StaffProfilePage() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Department:</span>
-                  <span className="font-medium">{staff.department}</span>
+                  <span className="font-medium">{staff.department || 'Not assigned'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Position:</span>
-                  <span className="font-medium">{staff.position}</span>
+                  <span className="font-medium">{staff.position || 'Staff'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Join Date:</span>
-                  <span className="font-medium">{new Date(staff.joinDate).toLocaleDateString()}</span>
+                  <span className="font-medium">{staff.joinDate ? new Date(staff.joinDate).toLocaleDateString() : 'Not available'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Years of Service:</span>
                   <span className="font-medium">
-                    {new Date().getFullYear() - new Date(staff.joinDate).getFullYear()} years
+                    {staff.joinDate ? new Date().getFullYear() - new Date(staff.joinDate).getFullYear() : 0} years
                   </span>
                 </div>
               </CardContent>
@@ -188,7 +188,7 @@ export default function StaffProfilePage() {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
-                  {staff.qualifications.map((qual, index) => (
+                  {staff.qualifications?.map((qual, index) => (
                     <li key={index} className="flex items-start gap-2">
                       <span className="text-primary">•</span>
                       <span className="text-muted-foreground">{qual}</span>
@@ -204,7 +204,7 @@ export default function StaffProfilePage() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {staff.specialization.map((area, index) => (
+                  {staff.specialization?.map((area, index) => (
                     <Badge key={index} variant="outline">
                       {area}
                     </Badge>

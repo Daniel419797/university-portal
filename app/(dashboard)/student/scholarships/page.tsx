@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,108 +9,67 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
-import { GraduationCap, DollarSign, Calendar, Users, FileText } from "lucide-react";
-
-interface Scholarship {
-  id: string;
-  name: string;
-  description: string;
-  amount: number;
-  eligibilityCriteria: string;
-  deadline: string;
-  status: "open" | "closed";
-  slots: number;
-  applicants: number;
-}
-
-interface ScholarshipApplication {
-  id: string;
-  scholarshipName: string;
-  amount: number;
-  status: "pending" | "under_review" | "approved" | "rejected";
-  appliedAt: string;
-}
+import { GraduationCap, DollarSign, Calendar } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import {
+  studentService,
+  type Scholarship,
+  type ScholarshipApplication,
+  type ScholarshipApplicationRequest,
+} from "@/lib/services";
 
 export default function StudentScholarshipsPage() {
   const [showApplicationDialog, setShowApplicationDialog] = useState(false);
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
+  const [applicationForm, setApplicationForm] = useState<ScholarshipApplicationRequest>({
+    scholarshipId: "",
+    reason: "",
+    documents: [],
+  });
 
-  const scholarships: Scholarship[] = [
-    {
-      id: "1",
-      name: "Merit Scholarship",
-      description: "For students with outstanding academic performance",
-      amount: 100000,
-      eligibilityCriteria: "CGPA ≥ 4.5, No failed courses",
-      deadline: "2026-02-28",
-      status: "open",
-      slots: 50,
-      applicants: 32,
-    },
-    {
-      id: "2",
-      name: "Need-Based Scholarship",
-      description: "Financial assistance for students from low-income families",
-      amount: 75000,
-      eligibilityCriteria: "Proven financial need, CGPA ≥ 3.5",
-      deadline: "2026-03-15",
-      status: "open",
-      slots: 100,
-      applicants: 78,
-    },
-    {
-      id: "3",
-      name: "Sports Excellence Award",
-      description: "For students with exceptional sports achievements",
-      amount: 50000,
-      eligibilityCriteria: "State/National level sports participation",
-      deadline: "2026-02-15",
-      status: "open",
-      slots: 20,
-      applicants: 15,
-    },
-    {
-      id: "4",
-      name: "Research Grant",
-      description: "Support for undergraduate research projects",
-      amount: 150000,
-      eligibilityCriteria: "Research proposal required, CGPA ≥ 4.0",
-      deadline: "2026-01-31",
-      status: "open",
-      slots: 10,
-      applicants: 8,
-    },
-  ];
+  const {
+    data: scholarships,
+    isLoading: loadingScholarships,
+    execute: loadScholarships,
+  } = useApi<Scholarship[]>();
 
-  const myApplications: ScholarshipApplication[] = [
-    {
-      id: "1",
-      scholarshipName: "Merit Scholarship",
-      amount: 100000,
-      status: "under_review",
-      appliedAt: "2026-01-05",
-    },
-  ];
+  const {
+    data: applications,
+    isLoading: loadingApplications,
+    execute: loadApplications,
+  } = useApi<ScholarshipApplication[]>();
+
+  const { isLoading: submitting, execute: submitApplication } = useApi<ScholarshipApplication>();
+
+  useEffect(() => {
+    loadScholarships(() => studentService.getScholarships(), {
+      errorMessage: "Failed to load scholarships",
+    });
+    loadApplications(() => studentService.getScholarshipApplications(), {
+      errorMessage: "Failed to load applications",
+    });
+  }, [loadApplications, loadScholarships]);
 
   const handleApply = (scholarship: Scholarship) => {
     setSelectedScholarship(scholarship);
+    setApplicationForm({ scholarshipId: scholarship.id, reason: "", documents: [] });
     setShowApplicationDialog(true);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "default";
-      case "under_review":
-        return "secondary";
-      case "pending":
-        return "outline";
-      case "rejected":
-        return "destructive";
-      default:
-        return "outline";
-    }
+  const submit = async () => {
+    if (!applicationForm.scholarshipId || !applicationForm.reason) return;
+
+    await submitApplication(async () => {
+      await studentService.applyForScholarship(applicationForm);
+      const refreshed = await studentService.getScholarshipApplications();
+      await loadApplications(() => Promise.resolve(refreshed));
+      return refreshed[0] || null;
+    }, {
+      successMessage: "Application submitted",
+      errorMessage: "Could not submit application",
+    });
+
+    setShowApplicationDialog(false);
   };
 
   return (
@@ -122,39 +81,54 @@ export default function StudentScholarshipsPage() {
         </div>
 
         {/* My Applications */}
-        {myApplications.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>My Applications</CardTitle>
-              <CardDescription>Track your scholarship applications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {myApplications.map((app) => (
-                  <div key={app.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-medium">{app.scholarshipName}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Applied: {new Date(app.appliedAt).toLocaleDateString()}
-                      </p>
-                      <p className="text-sm font-medium mt-1">₦{app.amount.toLocaleString()}</p>
-                    </div>
-                    <Badge variant={getStatusColor(app.status)}>{app.status}</Badge>
+        <Card>
+          <CardHeader>
+            <CardTitle>My Applications</CardTitle>
+            <CardDescription>Track your scholarship applications</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingApplications && <p className="text-sm text-muted-foreground">Loading applications...</p>}
+            {!loadingApplications && (!applications || applications.length === 0) && (
+              <p className="text-sm text-muted-foreground">No scholarship applications yet.</p>
+            )}
+            <div className="space-y-3">
+              {applications?.map((app) => (
+                <div key={app.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-medium">{app.scholarshipName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Applied: {new Date(app.submittedAt).toLocaleDateString()}
+                    </p>
+                    {app.awardedAmount && (
+                      <p className="text-sm font-medium mt-1">₦{app.awardedAmount.toLocaleString()}</p>
+                    )}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  <Badge
+                    variant={
+                      app.status === "approved"
+                        ? "success"
+                        : app.status === "rejected"
+                        ? "destructive"
+                        : "secondary"
+                    }
+                  >
+                    {app.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Available Scholarships */}
         <div>
           <h2 className="text-xl font-semibold mb-4">Available Scholarships</h2>
           <div className="grid gap-4 md:grid-cols-2">
-            {scholarships.map((scholarship) => {
-              const progress = (scholarship.applicants / scholarship.slots) * 100;
-              const hasApplied = myApplications.some(
-                (app) => app.scholarshipName === scholarship.name
+            {loadingScholarships && <p className="text-sm text-muted-foreground">Loading scholarships...</p>}
+
+            {!loadingScholarships && scholarships?.map((scholarship) => {
+              const hasApplied = applications?.some(
+                (app) => app.scholarshipId === scholarship.id
               );
 
               return (
@@ -190,28 +164,15 @@ export default function StudentScholarshipsPage() {
                           Deadline: {new Date(scholarship.deadline).toLocaleDateString()}
                         </span>
                       </div>
-
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span>
-                          {scholarship.applicants}/{scholarship.slots} applicants
-                        </span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Application Progress</span>
-                        <span className="font-medium">{progress.toFixed(0)}%</span>
-                      </div>
-                      <Progress value={progress} />
                     </div>
 
                     <div className="border-t pt-3">
                       <p className="text-sm font-medium mb-1">Eligibility Criteria</p>
-                      <p className="text-sm text-muted-foreground">
-                        {scholarship.eligibilityCriteria}
-                      </p>
+                      <ul className="text-sm text-muted-foreground list-disc pl-4 space-y-1">
+                        {scholarship.eligibilityCriteria.map((criteria: string, idx: number) => (
+                          <li key={idx}>{criteria}</li>
+                        ))}
+                      </ul>
                     </div>
 
                     <Button
@@ -239,25 +200,27 @@ export default function StudentScholarshipsPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Current CGPA</Label>
-                <Input type="number" step="0.01" min="0" max="5" placeholder="4.50" />
-              </div>
-              <div>
                 <Label>Personal Statement</Label>
                 <Textarea
                   placeholder="Explain why you should be awarded this scholarship..."
                   rows={5}
+                  value={applicationForm.reason}
+                  onChange={(e) =>
+                    setApplicationForm((prev) => ({ ...prev, reason: e.target.value }))
+                  }
                 />
               </div>
               <div>
                 <Label>Supporting Documents</Label>
-                <Input type="file" multiple />
+                <Input type="file" multiple disabled />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Upload transcripts, certificates, or other relevant documents
+                  Upload via portal once enabled. Currently optional.
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button className="flex-1">Submit Application</Button>
+                <Button className="flex-1" onClick={submit} disabled={submitting || !applicationForm.reason}>
+                  {submitting ? "Submitting..." : "Submit Application"}
+                </Button>
                 <Button
                   variant="outline"
                   className="flex-1"

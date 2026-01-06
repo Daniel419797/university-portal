@@ -1,36 +1,57 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, CheckCircle, Clock, AlertCircle, Download, Plus } from "lucide-react";
 import Link from "next/link";
-import { mockPayments } from "@/lib/mock-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { useApi } from "@/hooks/use-api";
+import { studentService, type Payment } from "@/lib/services";
 
 export default function StudentPaymentsPage() {
-  const totalPaid = mockPayments
-    .filter((p) => p.status === "verified")
-    .reduce((sum, p) => sum + p.amount, 0);
-  
-  const pendingAmount = mockPayments
-    .filter((p) => p.status === "pending")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const { data: payments, isLoading, execute } = useApi<Payment[]>();
+
+  useEffect(() => {
+    execute(() => studentService.getPayments(), {
+      errorMessage: "Failed to load payments",
+    });
+  }, [execute]);
+
+  const paymentList = useMemo(() => {
+    if (Array.isArray(payments)) return payments;
+    const nested = (payments as unknown as { payments?: Payment[] } | undefined)?.payments;
+    return Array.isArray(nested) ? nested : [];
+  }, [payments]);
+
+  const totals = useMemo(() => {
+    const list = paymentList;
+    const verifiedTotal = list
+      .filter((p) => p.status === "completed")
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    const pendingTotal = list
+      .filter((p) => p.status === "pending")
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    return { verifiedTotal, pendingTotal };
+  }, [paymentList]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "success"> = {
       verified: "success",
       pending: "secondary",
       processing: "secondary",
-      rejected: "destructive",
+      failed: "destructive",
     };
     return variants[status] || "default";
   };
 
   const getStatusIcon = (status: string) => {
     if (status === "verified") return <CheckCircle className="h-4 w-4" />;
-    if (status === "rejected") return <AlertCircle className="h-4 w-4" />;
+    if (status === "failed") return <AlertCircle className="h-4 w-4" />;
     return <Clock className="h-4 w-4" />;
   };
 
@@ -61,7 +82,7 @@ export default function StudentPaymentsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(totalPaid)}
+                {formatCurrency(totals.verifiedTotal)}
               </div>
             </CardContent>
           </Card>
@@ -71,7 +92,7 @@ export default function StudentPaymentsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">
-                {formatCurrency(pendingAmount)}
+                {formatCurrency(totals.pendingTotal)}
               </div>
             </CardContent>
           </Card>
@@ -81,7 +102,7 @@ export default function StudentPaymentsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {pendingAmount === 0 ? (
+                {totals.pendingTotal === 0 ? (
                   <Badge variant="success" className="text-base">Up to Date</Badge>
                 ) : (
                   <Badge variant="secondary" className="text-base">Pending</Badge>
@@ -136,51 +157,61 @@ export default function StudentPaymentsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockPayments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-4"
-                >
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="rounded-full bg-primary/10 p-3">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{payment.description}</p>
-                        <Badge variant={getStatusBadge(payment.status)}>
-                          <span className="flex items-center gap-1">
-                            {getStatusIcon(payment.status)}
-                            {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                          </span>
-                        </Badge>
+              {isLoading && <p className="text-sm text-muted-foreground">Loading payments...</p>}
+
+              {!isLoading && paymentList.length === 0 && (
+                <p className="text-sm text-muted-foreground">No payments found.</p>
+              )}
+
+              {!isLoading && paymentList.map((payment) => {
+                const createdAt = (payment as Payment & { createdAt?: string; date?: string }).createdAt ||
+                  (payment as Payment & { date?: string }).date;
+
+                const description = payment.description;
+
+                return (
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between rounded-lg border border-border p-4"
+                  >
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className="rounded-full bg-primary/10 p-3">
+                        <DollarSign className="h-5 w-5 text-primary" />
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Reference: {payment.reference}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Date: {formatDate(payment.date)}
-                      </p>
-                      {payment.verifiedBy && payment.verifiedAt && (
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{description}</p>
+                          <Badge variant={getStatusBadge(payment.status)}>
+                            <span className="flex items-center gap-1">
+                              {getStatusIcon(payment.status)}
+                              {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                            </span>
+                          </Badge>
+                        </div>
                         <p className="text-sm text-muted-foreground">
-                          Verified by {payment.verifiedBy} on {formatDate(payment.verifiedAt)}
+                          Reference: {payment.reference}
                         </p>
+                        {createdAt && (
+                          <p className="text-sm text-muted-foreground">
+                            Date: {formatDate(createdAt)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <p className="text-lg font-bold">{formatCurrency(payment.amount)}</p>
+                      {payment.status === "completed" && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/student/payments/${payment.id}/receipt`}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Receipt
+                          </Link>
+                        </Button>
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <p className="text-lg font-bold">{formatCurrency(payment.amount)}</p>
-                    {payment.status === "verified" && (
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/student/payments/${payment.id}/receipt`}>
-                          <Download className="mr-2 h-4 w-4" />
-                          Receipt
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

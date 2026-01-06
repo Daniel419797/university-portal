@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,71 +14,93 @@ import {
   BarChart3,
 } from "lucide-react";
 import Link from "next/link";
-import { mockCourses } from "@/lib/mock-data";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService, LecturerDashboardStats } from "@/lib/services/lecturerService";
 
 export default function LecturerDashboardPage() {
+  const { data: dashboardData, isLoading, execute } = useApi<LecturerDashboardStats>();
+
+  useEffect(() => {
+    execute(() => lecturerService.getDashboard(), {
+      errorMessage: "Failed to load dashboard"
+    });
+  }, [execute]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading dashboard...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!dashboardData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-muted-foreground">Dashboard data not available</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const stats = [
     {
       title: "My Courses",
-      value: "3",
+      value: dashboardData.assignedCourses.toString(),
       icon: BookOpen,
       href: "/lecturer/courses",
-      color: "text-blue-500",
     },
     {
       title: "Total Students",
-      value: "145",
+      value: dashboardData.totalStudents.toString(),
       icon: Users,
       href: "/lecturer/students",
-      color: "text-green-500",
     },
     {
-      title: "Pending Grading",
-      value: "8",
+      title: "Assignments",
+      value: dashboardData.pendingSubmissions.toString(),
       icon: FileText,
       href: "/lecturer/assignments",
-      color: "text-orange-500",
     },
     {
-      title: "Course Average",
-      value: "78%",
+      title: "Quizzes",
+      value: dashboardData.pendingQuizzes.toString(),
       icon: TrendingUp,
-      href: "/lecturer/analytics",
-      color: "text-purple-500",
+      href: "/lecturer/quizzes",
     },
   ];
-
-  const myCourses = mockCourses.slice(0, 3);
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Page Header */}
         <div>
-          <h1 className="text-3xl font-bold">Lecturer Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage your courses, students, and assessments
-          </p>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back! Here's your overview.</p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Link key={stat.title} href={stat.href}>
-                <Card className="transition-shadow hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                    <Icon className={`h-4 w-4 ${stat.color}`} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+          {stats.map((stat) => (
+            <Card key={stat.title}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-bold">{stat.value}</p>
+                    <p className="text-sm text-muted-foreground">{stat.title}</p>
+                  </div>
+                  <stat.icon className="h-8 w-8 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Quick Actions */}
@@ -86,11 +109,11 @@ export default function LecturerDashboardPage() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <Link href="/lecturer/attendance">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Mark Attendance
+                <Link href="/lecturer/courses">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  View Courses
                 </Link>
               </Button>
               <Button variant="outline" className="w-full justify-start" asChild>
@@ -116,34 +139,31 @@ export default function LecturerDashboardPage() {
         </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* My Courses */}
+          {/* Upcoming Classes */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>My Courses</CardTitle>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/lecturer/courses">View all</Link>
-                </Button>
-              </div>
+              <CardTitle>Upcoming Classes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {myCourses.map((course) => (
-                  <div
-                    key={course.id}
-                    className="flex items-start justify-between rounded-lg border border-border p-4"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium">{course.code}</p>
-                      <p className="text-sm text-muted-foreground">{course.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {course.enrolled} students enrolled
-                      </p>
+              {dashboardData.upcomingClasses.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No upcoming classes</p>
+              ) : (
+                <div className="space-y-3">
+                  {dashboardData.upcomingClasses.map((classItem) => (
+                    <div key={classItem.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                      <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-medium">{classItem.courseCode} - {classItem.courseTitle}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(classItem.date).toLocaleDateString()} • {classItem.time}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{classItem.venue}</p>
+                      </div>
+                      <Badge variant="outline">{classItem.type}</Badge>
                     </div>
-                    <Badge variant="secondary">{course.level} Level</Badge>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

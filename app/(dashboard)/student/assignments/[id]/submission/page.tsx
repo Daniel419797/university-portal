@@ -6,40 +6,67 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, FileText, Calendar, Clock, Download, MessageSquare } from "lucide-react";
 import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useApi } from "@/hooks/use-api";
+import { studentService, type AssignmentSubmissionDetails } from "@/lib/services";
+import { fileService } from "@/lib/services/sharedService";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ViewSubmissionPage() {
   const params = useParams();
-  const assignmentId = params?.id;
+  const assignmentId = params?.id as string;
 
-  const submission = {
-    id: "SUB12345",
-    assignmentTitle: "Search Algorithms Implementation",
-    course: "CSC 401 - Artificial Intelligence",
-    submittedDate: "2025-12-03T15:30:00",
-    status: "graded", // 'pending', 'graded'
-    fileName: "search_algorithms_STU2023001.zip",
-    fileSize: "8.5 MB",
-    comments: "I've implemented all three algorithms as required. The visualization is included in the Jupyter notebook. I used Python 3.11 and included all dependencies in requirements.txt.",
-    grade: 85,
-    totalMarks: 100,
-    gradedDate: "2025-12-15T10:00:00",
-    feedback: "Excellent implementation of all three algorithms. Your code is well-structured and properly commented. The visualization is clear and helpful. The analysis report is thorough. However, the A* heuristic could be optimized further for better performance. Overall, great work!",
-    lecturer: "Dr. Michael Chen",
-    submissionHistory: [
-      {
-        date: "2025-12-03T15:30:00",
-        action: "Submitted",
-        details: "Initial submission uploaded",
-      },
-      {
-        date: "2025-12-15T10:00:00",
-        action: "Graded",
-        details: "Assignment graded by Dr. Michael Chen",
-      },
-    ],
+  const { data: submission, isLoading, execute } = useApi<AssignmentSubmissionDetails>();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!assignmentId) return;
+    execute(() => studentService.getSubmission(String(assignmentId)), {
+      errorMessage: "Failed to load submission",
+    });
+  }, [assignmentId, execute]);
+
+  const isLate = submission?.submittedAt
+    ? new Date(submission.submittedAt) > new Date()
+    : false;
+
+  const handleDownload = async (file: { id?: string; url: string; name: string }) => {
+    setDownloadingId(file.id || file.url);
+    try {
+      const blob = file.id
+        ? await fileService.downloadFile(file.id)
+        : await fetch(file.url).then((res) => {
+            if (!res.ok) throw new Error("Download failed");
+            return res.blob();
+          });
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = file.name || "submission";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      toast({ title: "Download failed", description: "Unable to download file. Please try again.", variant: "destructive" });
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
-  const isLate = new Date(submission.submittedDate) > new Date("2025-12-05T23:59:00");
+  if (isLoading || !submission) {
+    return (
+      <DashboardLayout>
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading submission...</CardTitle>
+          </CardHeader>
+        </Card>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -48,16 +75,16 @@ export default function ViewSubmissionPage() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-bold">Assignment Submission</h1>
-            <p className="text-muted-foreground">{submission.assignmentTitle}</p>
+            <p className="text-muted-foreground">{submission?.comment}</p>
           </div>
           <Badge
             className={
-              submission.status === "graded"
+              submission?.status === "graded"
                 ? "bg-green-500"
                 : "bg-yellow-500"
             }
           >
-            {submission.status === "graded" ? (
+            {submission?.status === "graded" ? (
               <>
                 <CheckCircle className="mr-1 h-3 w-3" />
                 Graded
@@ -72,7 +99,7 @@ export default function ViewSubmissionPage() {
         </div>
 
         {/* Grading Results (if graded) */}
-        {submission.status === "graded" && (
+        {submission?.status === "graded" && (
           <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -81,7 +108,7 @@ export default function ViewSubmissionPage() {
                   Graded
                 </span>
                 <span className="text-3xl font-bold text-green-600 dark:text-green-400">
-                  {submission.grade}/{submission.totalMarks}
+                  {submission.grade}/{submission.grade ? submission.grade : submission.totalMarks}
                 </span>
               </CardTitle>
             </CardHeader>
@@ -91,18 +118,6 @@ export default function ViewSubmissionPage() {
                   Lecturer Feedback:
                 </p>
                 <p className="text-green-800 dark:text-green-200">{submission.feedback}</p>
-              </div>
-              <div className="flex items-center justify-between text-sm text-green-700 dark:text-green-300">
-                <span>Graded by: {submission.lecturer}</span>
-                <span>
-                  {new Date(submission.gradedDate).toLocaleString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "numeric",
-                  })}
-                </span>
               </div>
             </CardContent>
           </Card>
@@ -127,16 +142,20 @@ export default function ViewSubmissionPage() {
             </CardHeader>
             <CardContent>
               <p className="font-bold">
-                {new Date(submission.submittedDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
+                {submission?.submittedAt
+                  ? new Date(submission.submittedAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : ""}
               </p>
               <p className="text-xs text-muted-foreground">
-                {new Date(submission.submittedDate).toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "numeric",
-                })}
+                {submission?.submittedAt
+                  ? new Date(submission.submittedAt).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "numeric",
+                    })
+                  : ""}
               </p>
             </CardContent>
           </Card>
@@ -160,7 +179,7 @@ export default function ViewSubmissionPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <p className="font-bold text-sm">{submission.course}</p>
+              <p className="font-bold text-sm">{submission?.assignmentId || "N/A"}</p>
             </CardContent>
           </Card>
         </div>
@@ -170,33 +189,43 @@ export default function ViewSubmissionPage() {
           <CardHeader>
             <CardTitle>Submitted File</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded">
-                  <FileText className="h-6 w-6 text-primary" />
+          <CardContent className="space-y-3">
+            {submission.files?.length ? (
+              submission.files.map((file: AssignmentSubmissionDetails["files"][number], idx: number) => (
+                <div key={idx} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded">
+                      <FileText className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{file.name}</p>
+                      <p className="text-sm text-muted-foreground">{file.size} KB</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownload(file)}
+                    disabled={downloadingId === (file.id || file.url)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {downloadingId === (file.id || file.url) ? "Downloading..." : "Download"}
+                  </Button>
                 </div>
-                <div>
-                  <p className="font-medium">{submission.fileName}</p>
-                  <p className="text-sm text-muted-foreground">{submission.fileSize}</p>
-                </div>
-              </div>
-              <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Download
-              </Button>
-            </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No files uploaded.</p>
+            )}
           </CardContent>
         </Card>
 
         {/* Student Comments */}
-        {submission.comments && (
+        {submission.comment && (
           <Card>
             <CardHeader>
               <CardTitle>Submission Comments</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">{submission.comments}</p>
+              <p className="text-muted-foreground">{submission.comment}</p>
             </CardContent>
           </Card>
         )}
@@ -208,20 +237,16 @@ export default function ViewSubmissionPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {submission.submissionHistory.map((event, index) => (
+              {submission?.files?.map((file: AssignmentSubmissionDetails["files"][number], index: number) => (
                 <div key={index} className="flex items-start gap-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-                    {event.action === "Submitted" ? (
-                      <CheckCircle className="h-5 w-5 text-primary" />
-                    ) : (
-                      <FileText className="h-5 w-5 text-primary" />
-                    )}
+                    <FileText className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <p className="font-medium">{event.action}</p>
+                      <p className="font-medium">{file.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(event.date).toLocaleString("en-US", {
+                        Uploaded {new Date(submission?.submittedAt || "").toLocaleString("en-US", {
                           month: "short",
                           day: "numeric",
                           year: "numeric",
@@ -230,7 +255,7 @@ export default function ViewSubmissionPage() {
                         })}
                       </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{event.details}</p>
+                    <p className="text-sm text-muted-foreground">Size: {file.size} KB</p>
                   </div>
                 </div>
               ))}

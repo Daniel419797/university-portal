@@ -1,13 +1,53 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, FileText, TrendingUp, DollarSign } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { bursaryService } from "@/lib/services/hodBursaryService";
+import { useToast } from "@/hooks/use-toast";
 
 export default function BursaryReportsPage() {
+  const [reportType, setReportType] = useState("payment-summary");
+  const [startDate, setStartDate] = useState("2025-01-01");
+  const [endDate, setEndDate] = useState("2026-01-01");
+  const { toast } = useToast();
+  
+  const { data: reportData, isLoading, execute } = useApi<{ reportType: string; period: string; data: Array<Record<string, unknown>>; summary: { totalRevenue: number; totalPayments: number; pendingAmount: number } }>();
+
+  useEffect(() => {
+    execute(() => bursaryService.getReports({ 
+      reportType,
+      dateFrom: startDate,
+      dateTo: endDate 
+    }), {
+      errorMessage: "Failed to load reports"
+    });
+  }, [execute, reportType, startDate, endDate]);
+
+  const handleGenerateReport = async () => {
+    try {
+      const result = await bursaryService.generateCustomReport({
+        reportType,
+        startDate,
+        endDate
+      });
+      toast({
+        title: "Report Generated",
+        description: `Report generated successfully. Download URL: ${result.downloadUrl}`
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate report",
+        variant: "destructive"
+      });
+    }
+  };
   const reportTypes = [
     {
       id: "payment-summary",

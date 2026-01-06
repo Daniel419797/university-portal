@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import {
   ArrowLeft, User, Bed, Wrench, 
   CheckCircle, XCircle, Edit, Save, Phone
 } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { adminService, RoomDetails } from "@/lib/services/adminService";
 
 export default function RoomManagementPage() {
   const params = useParams();
@@ -22,83 +24,45 @@ export default function RoomManagementPage() {
   const [roomCapacity, setRoomCapacity] = useState("4");
   const [roomType, setRoomType] = useState("Shared");
 
-  // Mock room data
-  const room = {
-    hostelId: params.id,
-    hostelName: "Unity Hall",
-    blockName: "Block A",
-    roomNumber: params.roomNumber || "205",
-    floor: "2nd Floor",
-    type: "Shared",
-    capacity: 4,
-    occupied: 3,
-    status: "occupied",
-    price: "₦50,000/semester",
-    hasAC: true,
-    hasWardrobe: true,
-    hasBathroom: true,
-  };
+  const hostelId = params.id as string;
+  const roomNumber = params.roomNumber as string;
 
-  const occupants = [
-    {
-      id: "1",
-      name: "John Doe",
-      matricNumber: "CS/2021/001",
-      phone: "+234 801 234 5678",
-      bedNumber: "1",
-      checkInDate: "2025-09-01",
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Mike Johnson",
-      matricNumber: "CS/2021/003",
-      phone: "+234 802 345 6789",
-      bedNumber: "2",
-      checkInDate: "2025-09-01",
-      status: "active",
-    },
-    {
-      id: "3",
-      name: "David Williams",
-      matricNumber: "CS/2021/005",
-      phone: "+234 803 456 7890",
-      bedNumber: "3",
-      checkInDate: "2025-09-02",
-      status: "active",
-    },
-  ];
+  const { data: roomData, isLoading, execute } = useApi<RoomDetails>();
 
-  const maintenanceRequests = [
-    {
-      id: "1",
-      issue: "Broken Window",
-      reportedBy: "John Doe",
-      reportedDate: "2025-12-20",
-      status: "pending",
-      priority: "high",
-      description: "Window pane is cracked and needs replacement",
-    },
-    {
-      id: "2",
-      issue: "Leaking Faucet",
-      reportedBy: "Mike Johnson",
-      reportedDate: "2025-12-18",
-      status: "in-progress",
-      priority: "medium",
-      description: "Bathroom faucet is leaking continuously",
-    },
-    {
-      id: "3",
-      issue: "AC Not Working",
-      reportedBy: "David Williams",
-      reportedDate: "2025-12-15",
-      status: "resolved",
-      priority: "high",
-      description: "Air conditioning unit stopped working",
-      resolvedDate: "2025-12-28",
-    },
-  ];
+  useEffect(() => {
+    if (hostelId && roomNumber) {
+      execute(() => adminService.getHostelRoom(hostelId, roomNumber), {
+        errorMessage: "Failed to load room details"
+      });
+    }
+  }, [execute, hostelId, roomNumber]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading room details...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!roomData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Room not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const room = roomData;
+  const occupants = roomData.occupants || [];
+  const maintenanceRequests = roomData.maintenanceRequests || [];
 
   const availableBeds = [1, 2, 3, 4].filter(
     bedNum => !occupants.some(occ => occ.bedNumber === bedNum.toString())

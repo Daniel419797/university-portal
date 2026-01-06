@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,49 +8,34 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, Mail, Phone, BookOpen } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { hodService } from "@/lib/services/hodBursaryService";
 
 export default function HODStaffPage() {
-  const staffMembers = [
-    {
-      id: "1",
-      name: "Dr. Michael Anderson",
-      email: "anderson@university.edu",
-      phone: "+234 801 234 5678",
-      position: "Senior Lecturer",
-      specialization: "Data Structures & Algorithms",
-      coursesAssigned: 3,
-      studentsSupervised: 45,
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Prof. Sarah Thompson",
-      email: "thompson@university.edu",
-      phone: "+234 802 345 6789",
-      position: "Professor",
-      specialization: "Database Management",
-      coursesAssigned: 2,
-      studentsSupervised: 52,
-      status: "active",
-    },
-    {
-      id: "3",
-      name: "Dr. David Martinez",
-      email: "martinez@university.edu",
-      phone: "+234 803 456 7890",
-      position: "Lecturer I",
-      specialization: "Software Engineering",
-      coursesAssigned: 4,
-      studentsSupervised: 58,
-      status: "active",
-    },
-  ];
+  const { data: staffMembers, isLoading, execute } = useApi<Array<{ id: string; name: string; email: string; specialization: string; coursesAssigned: number; phone?: string; studentsSupervised?: number; status?: string }>>();
+
+  useEffect(() => {
+    execute(() => hodService.getStaff(), {
+      errorMessage: "Failed to load staff members"
+    });
+  }, [execute]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading staff members...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const stats = [
-    { title: "Total Faculty", value: "28", icon: Users },
-    { title: "Professors", value: "8", icon: Users },
-    { title: "Senior Lecturers", value: "12", icon: Users },
-    { title: "Lecturers", value: "8", icon: Users },
+    { title: "Total Faculty", value: staffMembers?.length.toString() || "0", icon: Users },
+    { title: "Active Courses", value: staffMembers?.reduce((sum, s) => sum + s.coursesAssigned, 0).toString() || "0", icon: BookOpen },
   ];
 
   return (
@@ -105,10 +91,10 @@ export default function HODStaffPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {staffMembers.map((staff) => (
+                {(staffMembers || []).map((staff) => (
                   <TableRow key={staff.id}>
                     <TableCell className="font-medium">{staff.name}</TableCell>
-                    <TableCell>{staff.position}</TableCell>
+                    <TableCell>N/A</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {staff.specialization}
                     </TableCell>
@@ -121,7 +107,7 @@ export default function HODStaffPage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4 text-muted-foreground" />
-                        {staff.studentsSupervised}
+                        {staff.studentsSupervised || 0}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -132,15 +118,15 @@ export default function HODStaffPage() {
                         </div>
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Phone className="h-3 w-3" />
-                          {staff.phone}
+                          {staff.phone || 'N/A'}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={staff.status === "active" ? "default" : "secondary"}
+                        variant={(staff.status || 'active') === "active" ? "default" : "secondary"}
                       >
-                        {staff.status}
+                        {staff.status || 'active'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -163,18 +149,18 @@ export default function HODStaffPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {staffMembers.map((staff) => (
+              {(staffMembers || []).map((staff) => (
                 <div key={staff.id}>
                   <div className="flex justify-between text-sm mb-2">
                     <span className="font-medium">{staff.name}</span>
                     <span className="text-muted-foreground">
-                      {staff.coursesAssigned} courses • {staff.studentsSupervised} students
+                      {staff.coursesAssigned} courses • {staff.studentsSupervised || 0} students
                     </span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-2">
                     <div
                       className="bg-primary h-2 rounded-full"
-                      style={{ width: `${(staff.studentsSupervised / 60) * 100}%` }}
+                      style={{ width: `${((staff.studentsSupervised || 0) / 60) * 100}%` }}
                     />
                   </div>
                 </div>

@@ -6,42 +6,49 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, FileText, AlertCircle, PlayCircle, CheckCircle, Calendar } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import Link from "next/link";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services/studentService";
+import { Quiz } from "@/lib/types";
 
 export default function QuizDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const quizId = params?.id;
+  const quizId = params?.id as string;
 
-  const quiz = {
-    id: quizId,
-    courseCode: "CSC 401",
-    courseName: "Artificial Intelligence",
-    title: "Mid-Semester Quiz",
-    description: "This quiz covers topics from Chapters 1-4 including search algorithms, knowledge representation, machine learning fundamentals, and neural networks. Make sure you understand the core concepts and algorithms discussed in lectures.",
-    instructions: [
-      "Read each question carefully before answering",
-      "You can navigate between questions using the Next/Previous buttons",
-      "All questions must be answered before submission",
-      "Once submitted, you cannot change your answers",
-      "Ensure you have a stable internet connection throughout the quiz",
-    ],
-    duration: 60, // minutes
-    totalMarks: 20,
-    questionsCount: 20,
-    startDate: "2026-01-10T09:00:00",
-    endDate: "2026-01-15T23:59:00",
-    passingMarks: 12,
-    attemptsAllowed: 1,
-    attemptsUsed: 0,
-    status: "active", // active, completed, graded, upcoming
-    score: null,
-    lecturer: "Dr. Michael Chen",
-    questionTypes: [
-      { type: "Multiple Choice", count: 15 },
-      { type: "True/False", count: 5 },
-    ],
-  };
+  const { data: quiz, isLoading, execute } = useApi<Quiz>();
+
+  useEffect(() => {
+    if (quizId) {
+      execute(() => studentService.getQuizDetails(quizId), {
+        errorMessage: "Failed to load quiz details"
+      });
+    }
+  }, [execute, quizId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading quiz...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!quiz) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Quiz not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const now = new Date();
   const startDate = new Date(quiz.startDate);
@@ -49,7 +56,7 @@ export default function QuizDetailsPage() {
   const isActive = now >= startDate && now <= endDate;
   const isUpcoming = now < startDate;
   const isExpired = now > endDate;
-  const hasAttemptsLeft = quiz.attemptsUsed < quiz.attemptsAllowed;
+  const hasAttemptsLeft = (quiz.attemptsUsed || 0) < (quiz.attemptsAllowed || 1);
   const canTakeQuiz = isActive && hasAttemptsLeft && quiz.status !== "completed";
 
   const timeRemaining = () => {
@@ -231,7 +238,7 @@ export default function QuizDetailsPage() {
               <CardTitle>Question Breakdown</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {quiz.questionTypes.map((type, index) => (
+              {(quiz.questionTypes || []).map((type, index) => (
                 <div key={index} className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{type.type}:</span>
                   <span className="font-medium">{type.count} questions</span>
@@ -252,7 +259,7 @@ export default function QuizDetailsPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {quiz.instructions.map((instruction, index) => (
+              {(quiz.instructions || []).map((instruction, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <span className="text-primary">•</span>
                   <span className="text-muted-foreground">{instruction}</span>

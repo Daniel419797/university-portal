@@ -1,64 +1,78 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, Users, TrendingUp, CheckCircle } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { bursaryService, BursaryDashboardStats } from "@/lib/services/hodBursaryService";
 
 export default function BursaryDashboardPage() {
+  const { data, isLoading, execute } = useApi<BursaryDashboardStats>();
+
+  useEffect(() => {
+    execute(() => bursaryService.getDashboard(), {
+      errorMessage: "Failed to load bursary dashboard"
+    });
+  }, [execute]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading dashboard...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!data) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-muted-foreground">No dashboard data available</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const totalPayments = Number(data.totalPayments ?? 0);
+  const verifiedPayments = Number(data.verifiedPayments ?? 0);
+  const pendingScholarships = Number(data.pendingScholarships ?? 0);
+  const totalRevenue = Number(data.totalRevenue ?? 0);
+
   const stats = [
     {
       title: "Total Revenue",
-      value: "₦450.2M",
-      change: "+18.5%",
+      value: `₦${(totalRevenue / 1000000).toFixed(1)}M`,
       icon: DollarSign,
       color: "text-green-500",
     },
     {
-      title: "Pending Payments",
-      value: "2,845",
-      change: "-12%",
+      title: "Total Payments",
+      value: totalPayments.toLocaleString(),
       icon: Users,
       color: "text-yellow-500",
     },
     {
       title: "Verified Payments",
-      value: "5,605",
-      change: "+25%",
+      value: verifiedPayments.toLocaleString(),
       icon: CheckCircle,
       color: "text-blue-500",
     },
     {
-      title: "Payment Rate",
-      value: "66.3%",
-      change: "+8.2%",
+      title: "Pending Scholarships",
+      value: String(pendingScholarships),
       icon: TrendingUp,
       color: "text-purple-500",
-    },
-  ];
-
-  const recentPayments = [
-    {
-      id: "1",
-      studentName: "John Doe",
-      matricNumber: "STU/2023/001",
-      amount: 150000,
-      type: "Tuition",
-      reference: "PAY/2026/001234",
-      date: "2026-01-01",
-      status: "pending",
-    },
-    {
-      id: "2",
-      studentName: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      amount: 150000,
-      type: "Tuition",
-      reference: "PAY/2026/001235",
-      date: "2026-01-01",
-      status: "pending",
     },
   ];
 
@@ -82,43 +96,52 @@ export default function BursaryDashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className="text-xs text-green-500">{stat.change} from last month</p>
                 </CardContent>
               </Card>
             );
           })}
         </div>
 
-        {/* Recent Payments */}
+        {/* Quick Stats */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Recent Payments</CardTitle>
-                <CardDescription>Payments awaiting verification</CardDescription>
+                <CardTitle>Payment Overview</CardTitle>
+                <CardDescription>Financial summary and pending items</CardDescription>
               </div>
               <Button asChild>
-                <Link href="/bursary/payments">View All</Link>
+                <Link href="/bursary/payments">View All Payments</Link>
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentPayments.map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">{payment.studentName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {payment.matricNumber} • {payment.type} • {payment.reference}
-                    </p>
-                    <p className="text-sm font-semibold mt-1">₦{payment.amount.toLocaleString()}</p>
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <Badge variant="secondary">{payment.status}</Badge>
-                    <Button size="sm">Verify</Button>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Total Payments Received</p>
+                  <p className="text-2xl font-bold mt-1">{totalPayments.toLocaleString()}</p>
                 </div>
-              ))}
+                <CheckCircle className="h-8 w-8 text-green-500" />
+              </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Verified Payments</p>
+                  <p className="text-2xl font-bold mt-1">{verifiedPayments.toLocaleString()}</p>
+                </div>
+                <Badge className="text-lg">
+                  {totalPayments === 0 ? '0%' : `${((verifiedPayments / totalPayments) * 100).toFixed(1)}%`}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Pending Scholarships</p>
+                  <p className="text-2xl font-bold mt-1">{pendingScholarships}</p>
+                </div>
+                <Button asChild size="sm">
+                  <Link href="/bursary/scholarships">Review</Link>
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -158,7 +181,7 @@ export default function BursaryDashboardPage() {
               <CardDescription>Monthly collection over the year</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+              <div className="h-50 flex items-center justify-center text-muted-foreground">
                 Chart placeholder - Payment trend
               </div>
             </CardContent>

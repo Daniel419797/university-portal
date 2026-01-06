@@ -1,36 +1,54 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, BookOpen, DollarSign, TrendingUp, Award, AlertCircle } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { adminService, type AdminAnalytics } from "@/lib/services";
 
 export default function AdminAnalyticsPage() {
+  const { data: analytics, isLoading, execute } = useApi<AdminAnalytics>();
+
+  useEffect(() => {
+    execute(() => adminService.getAnalytics(), {
+      errorMessage: "Failed to load analytics",
+    });
+  }, [execute]);
+
+  // derive display values from possible backend shapes
+  const totalStudents = analytics?.totals?.students ?? analytics?.users?.totalUsers ?? 0;
+  const totalCourses = analytics?.totals?.courses ?? analytics?.courses?.totalCourses ?? 0;
+  const pendingPayments = analytics?.finance?.pendingPayments ?? analytics?.financials?.outstandingAmount ?? 0;
+  const occupancyRateRaw = analytics?.hostels?.occupancyRate;
+  const occupancyDisplay = occupancyRateRaw == null ? '0%' : (occupancyRateRaw <= 1 ? `${(occupancyRateRaw * 100).toFixed(1)}%` : `${occupancyRateRaw}%`);
+
   const stats = [
     {
       title: "Total Students",
-      value: "8,450",
+      value: String(totalStudents?.toLocaleString?.() ?? String(totalStudents)),
       change: "+12.5%",
       icon: Users,
       color: "text-blue-500",
     },
     {
       title: "Total Courses",
-      value: "250",
+      value: String(totalCourses?.toLocaleString?.() ?? String(totalCourses)),
       change: "+5",
       icon: BookOpen,
       color: "text-green-500",
     },
     {
-      title: "Revenue (This Month)",
-      value: "₦45.2M",
-      change: "+18.2%",
+      title: "Pending Payments",
+      value: String(pendingPayments?.toLocaleString?.() ?? String(pendingPayments)),
+      change: "-",
       icon: DollarSign,
       color: "text-purple-500",
     },
     {
-      title: "Average CGPA",
-      value: "3.85",
-      change: "+0.15",
+      title: "Occupancy Rate",
+      value: occupancyDisplay,
+      change: "-",
       icon: Award,
       color: "text-yellow-500",
     },

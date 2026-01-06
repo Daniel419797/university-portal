@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Globe, DollarSign, Calendar, Mail } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { useToast } from "@/hooks/use-toast";
+import { adminService, type SystemSettings } from "@/lib/services";
 
 export default function AdminSettingsPage() {
+  const { toast } = useToast();
+  const { data: settings, isLoading, execute } = useApi<SystemSettings>();
+  const { isLoading: isSaving, execute: saveSettings } = useApi<SystemSettings>();
+  const [formData, setFormData] = useState<Partial<SystemSettings>>({});
+
+  useEffect(() => {
+    execute(() => adminService.getSettings(), {
+      errorMessage: "Failed to load settings",
+      onSuccess: (data) => setFormData(data as SystemSettings),
+    });
+  }, [execute]);
+
+  const handleSave = async () => {
+    await saveSettings(() => adminService.updateSettings(formData), {
+      successMessage: "Settings saved successfully",
+      errorMessage: "Failed to save settings",
+    });
+  };
   return (
     <DashboardLayout>
       <div className="space-y-6">

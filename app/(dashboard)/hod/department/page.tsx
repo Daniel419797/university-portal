@@ -1,54 +1,72 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Users, BookOpen, TrendingUp, Award } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { hodService } from "@/lib/services/hodBursaryService";
 
 export default function HODDepartmentPage() {
+  const { data: deptInfo, isLoading: loadingInfo, execute: executeInfo } = useApi<{ id: string; name: string; hod: string; totalStudents: number; totalStaff: number; totalCourses: number; established: string }>();
+  const { data: deptStats, isLoading: loadingStats, execute: executeStats } = useApi<{ totalStudents: number; studentsByLevel: Record<string, number>; averageCGPA: number; graduationRate: number; employmentRate: number }>();
+
+  useEffect(() => {
+    executeInfo(() => hodService.getDepartmentInfo(), {
+      errorMessage: "Failed to load department information"
+    });
+    executeStats(() => hodService.getDepartmentStatistics(), {
+      errorMessage: "Failed to load department statistics"
+    });
+  }, [executeInfo, executeStats]);
+
+  if (loadingInfo || loadingStats) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading department overview...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!deptInfo || !deptStats) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-muted-foreground">Department data not available</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const departmentStats = [
-    { title: "Total Students", value: "1,500", icon: Users },
-    { title: "Active Courses", value: "45", icon: BookOpen },
-    { title: "Faculty Members", value: "28", icon: Users },
-    { title: "Average CGPA", value: "4.2", icon: Award },
+    { title: "Total Students", value: deptInfo.totalStudents.toString(), icon: Users },
+    { title: "Active Courses", value: deptInfo.totalCourses.toString(), icon: BookOpen },
+    { title: "Faculty Members", value: deptInfo.totalStaff.toString(), icon: Users },
+    { title: "Average CGPA", value: deptStats.averageCGPA.toFixed(2), icon: Award },
   ];
 
-  const coursesByLevel = [
-    { level: "100", courses: 8, students: 450 },
-    { level: "200", courses: 10, students: 420 },
-    { level: "300", courses: 12, students: 380 },
-    { level: "400", courses: 15, students: 250 },
-  ];
-
-  const topPerformers = [
-    {
-      name: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      level: "400",
-      cgpa: 4.95,
-    },
-    {
-      name: "Michael Johnson",
-      matricNumber: "STU/2023/005",
-      level: "300",
-      cgpa: 4.89,
-    },
-    {
-      name: "Sarah Williams",
-      matricNumber: "STU/2023/008",
-      level: "400",
-      cgpa: 4.87,
-    },
-  ];
+  const coursesByLevel = Object.entries(deptStats.studentsByLevel).map(([level, students]) => ({
+    level,
+    students,
+  }));
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Department Overview</h1>
-          <p className="text-muted-foreground">Computer Science Department</p>
+          <p className="text-muted-foreground">{deptInfo.name}</p>
+          <p className="text-sm text-muted-foreground">Established: {new Date(deptInfo.established).getFullYear()}</p>
         </div>
 
         {/* Stats */}
@@ -70,11 +88,11 @@ export default function HODDepartmentPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Courses by Level */}
+          {/* Students by Level */}
           <Card>
             <CardHeader>
-              <CardTitle>Courses by Level</CardTitle>
-              <CardDescription>Course distribution across levels</CardDescription>
+              <CardTitle>Students by Level</CardTitle>
+              <CardDescription>Student distribution across levels</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -83,13 +101,13 @@ export default function HODDepartmentPage() {
                     <div className="flex justify-between text-sm mb-2">
                       <span className="font-medium">Level {level.level}</span>
                       <span className="text-muted-foreground">
-                        {level.courses} courses • {level.students} students
+                        {level.students} students
                       </span>
                     </div>
                     <div className="w-full bg-secondary rounded-full h-2">
                       <div
                         className="bg-primary h-2 rounded-full"
-                        style={{ width: `${(level.students / 1500) * 100}%` }}
+                        style={{ width: `${(level.students / deptStats.totalStudents) * 100}%` }}
                       />
                     </div>
                   </div>
@@ -98,28 +116,28 @@ export default function HODDepartmentPage() {
             </CardContent>
           </Card>
 
-          {/* Top Performers */}
+          {/* Department Rates */}
           <Card>
             <CardHeader>
-              <CardTitle>Top Performing Students</CardTitle>
-              <CardDescription>Students with highest CGPA</CardDescription>
+              <CardTitle>Department Performance</CardTitle>
+              <CardDescription>Key performance indicators</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {topPerformers.map((student, index) => (
-                  <div key={student.matricNumber} className="flex items-center gap-4 p-3 border rounded-lg">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {student.matricNumber} • Level {student.level}
-                      </p>
-                    </div>
-                    <Badge className="bg-green-500">{student.cgpa}</Badge>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="font-medium">Graduation Rate</p>
+                    <p className="text-sm text-muted-foreground">Students completing on time</p>
                   </div>
-                ))}
+                  <Badge className="bg-green-500">{deptStats.graduationRate}%</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <p className="font-medium">Employment Rate</p>
+                    <p className="text-sm text-muted-foreground">Employed within 6 months</p>
+                  </div>
+                  <Badge className="bg-blue-500">{deptStats.employmentRate}%</Badge>
+                </div>
               </div>
             </CardContent>
           </Card>

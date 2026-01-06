@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,93 +11,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Download, Users, TrendingUp, Award } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useApi } from "@/hooks/use-api";
+import { hodService } from "@/lib/services/hodBursaryService";
 
 export default function HODStudentsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("all");
+  
+  const { data: students, isLoading, execute } = useApi<Array<{ id: string; name: string; matricNumber: string; level: string; cgpa: number; status: string }>>();
 
-  const students = [
-    {
-      id: "1",
-      name: "John Doe",
-      matricNumber: "STU/2023/001",
-      level: "400",
-      cgpa: 4.85,
-      status: "active",
-      email: "john.doe@university.edu",
-      phone: "+234 123 456 7890",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      level: "400",
-      cgpa: 4.95,
-      status: "active",
-      email: "jane.smith@university.edu",
-      phone: "+234 123 456 7891",
-    },
-    {
-      id: "3",
-      name: "Michael Johnson",
-      matricNumber: "STU/2023/005",
-      level: "300",
-      cgpa: 4.72,
-      status: "active",
-      email: "michael.johnson@university.edu",
-      phone: "+234 123 456 7892",
-    },
-    {
-      id: "4",
-      name: "Sarah Williams",
-      matricNumber: "STU/2023/008",
-      level: "400",
-      cgpa: 4.88,
-      status: "active",
-      email: "sarah.williams@university.edu",
-      phone: "+234 123 456 7893",
-    },
-    {
-      id: "5",
-      name: "David Brown",
-      matricNumber: "STU/2024/010",
-      level: "200",
-      cgpa: 4.65,
-      status: "active",
-      email: "david.brown@university.edu",
-      phone: "+234 123 456 7894",
-    },
-    {
-      id: "6",
-      name: "Emily Davis",
-      matricNumber: "STU/2024/015",
-      level: "200",
-      cgpa: 4.78,
-      status: "active",
-      email: "emily.davis@university.edu",
-      phone: "+234 123 456 7895",
-    },
-  ];
-
-  const filteredStudents = students.filter(
-    (student) =>
-      (selectedLevel === "all" || student.level === selectedLevel) &&
-      (searchQuery === "" ||
-        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.matricNumber.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  useEffect(() => {
+    execute(() => hodService.getStudents({ 
+      level: selectedLevel === "all" ? undefined : selectedLevel,
+      search: searchQuery || undefined 
+    }), {
+      errorMessage: "Failed to load students"
+    });
+  }, [execute, selectedLevel, searchQuery]);
 
   const studentsByLevel = {
-    "100": students.filter((s) => s.level === "100").length,
-    "200": students.filter((s) => s.level === "200").length,
-    "300": students.filter((s) => s.level === "300").length,
-    "400": students.filter((s) => s.level === "400").length,
+    "100": students?.filter((s) => s.level === "100").length || 0,
+    "200": students?.filter((s) => s.level === "200").length || 0,
+    "300": students?.filter((s) => s.level === "300").length || 0,
+    "400": students?.filter((s) => s.level === "400").length || 0,
   };
 
-  const averageCGPA = (
-    students.reduce((sum, student) => sum + student.cgpa, 0) / students.length
-  ).toFixed(2);
+  const averageCGPA = students && students.length > 0
+    ? (students.reduce((sum, student) => sum + student.cgpa, 0) / students.length).toFixed(2)
+    : "0.00";
 
   const getCGPAColor = (cgpa: number) => {
     if (cgpa >= 4.5) return "text-green-600";
@@ -113,6 +55,19 @@ export default function HODStudentsPage() {
     if (cgpa >= 1.5) return "Third Class";
     return "Pass";
   };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading students...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -141,7 +96,7 @@ export default function HODStudentsPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{students.length}</div>
+              <div className="text-2xl font-bold">{students?.length || 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -160,7 +115,7 @@ export default function HODStudentsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {students.filter((s) => s.cgpa >= 4.5).length}
+                {students?.filter((s) => s.cgpa >= 4.5).length || 0}
               </div>
             </CardContent>
           </Card>
@@ -170,7 +125,7 @@ export default function HODStudentsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {students.filter((s) => s.status === "active").length}
+                {students?.filter((s) => s.status === "active").length || 0}
               </div>
             </CardContent>
           </Card>
@@ -226,7 +181,7 @@ export default function HODStudentsPage() {
           <CardHeader>
             <CardTitle>Students List</CardTitle>
             <CardDescription>
-              Showing {filteredStudents.length} of {students.length} students
+              Showing {students?.length || 0} students
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -244,53 +199,58 @@ export default function HODStudentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-mono font-semibold">
-                      {student.matricNumber}
-                    </TableCell>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Level {student.level}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`font-bold ${getCGPAColor(student.cgpa)}`}>
-                        {student.cgpa.toFixed(2)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          student.cgpa >= 4.5
-                            ? "bg-green-500"
-                            : student.cgpa >= 3.5
-                            ? "bg-blue-500"
-                            : "bg-yellow-500"
-                        }
-                      >
-                        {getCGPAClass(student.cgpa)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-xs space-y-1">
-                        <div>{student.email}</div>
-                        <div className="text-muted-foreground">{student.phone}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={student.status === "active" ? "default" : "secondary"}>
-                        {student.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/hod/students/${student.id}`}>
-                          View Profile
-                        </Link>
-                      </Button>
+                {!students || students.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                      No students found
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  students.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-mono font-semibold">
+                        {student.matricNumber}
+                      </TableCell>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">Level {student.level}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`font-bold ${getCGPAColor(student.cgpa)}`}>
+                          {student.cgpa.toFixed(2)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            student.cgpa >= 4.5
+                              ? "bg-green-500"
+                              : student.cgpa >= 3.5
+                              ? "bg-blue-500"
+                              : "bg-yellow-500"
+                          }
+                        >
+                          {getCGPAClass(student.cgpa)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs text-muted-foreground">N/A</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={student.status === "active" ? "default" : "secondary"}>
+                          {student.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/hod/students/${student.id}`}>
+                            View Profile
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,72 +10,60 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Search, Download, Mail, Eye, Filter } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService, CourseStudentsResponse } from "@/lib/services/lecturerService";
 
 export default function CourseStudentsPage() {
   const params = useParams();
   const router = useRouter();
+  const courseId = params.id as string;
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Mock course data
+  const { data: courseData, isLoading, execute } = useApi<CourseStudentsResponse>();
+
+  useEffect(() => {
+    if (courseId) {
+      execute(() => lecturerService.getCourseStudents(courseId), {
+        errorMessage: "Failed to load course students"
+      });
+    }
+  }, [execute, courseId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading course students...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!courseData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Course not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const course = {
-    id: params.id,
-    code: "CSC401",
-    title: "Software Engineering",
+    id: courseId,
+    code: courseData.courseCode,
+    title: courseData.courseTitle,
   };
 
-  const students = [
-    {
-      id: "1",
-      name: "John Doe",
-      matricNumber: "CS/2021/001",
-      email: "john.doe@university.edu",
-      level: "400L",
-      attendance: 28,
-      totalClasses: 30,
-      assignmentScore: 85,
-      quizScore: 90,
-      midtermScore: 88,
-      status: "active",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      matricNumber: "CS/2021/002",
-      email: "jane.smith@university.edu",
-      level: "400L",
-      attendance: 27,
-      totalClasses: 30,
-      assignmentScore: 92,
-      quizScore: 88,
-      midtermScore: 90,
-      status: "active",
-    },
-    {
-      id: "3",
-      name: "Mike Johnson",
-      matricNumber: "CS/2021/003",
-      email: "mike.johnson@university.edu",
-      level: "400L",
-      attendance: 25,
-      totalClasses: 30,
-      assignmentScore: 78,
-      quizScore: 82,
-      midtermScore: 80,
-      status: "active",
-    },
-    {
-      id: "4",
-      name: "Sarah Williams",
-      matricNumber: "CS/2021/004",
-      email: "sarah.williams@university.edu",
-      level: "400L",
-      attendance: 29,
-      totalClasses: 30,
-      assignmentScore: 95,
-      quizScore: 94,
-      midtermScore: 96,
-      status: "active",
-    },
-  ];
+  const students = courseData.students || [];
+  const filteredStudents = students.filter(
+    (student) =>
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.matricNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const getAttendancePercentage = (attended: number, total: number) => {
     return ((attended / total) * 100).toFixed(1);
@@ -122,7 +111,7 @@ export default function CourseStudentsPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-center">
-                <p className="text-3xl font-bold">{students.length}</p>
+                <p className="text-3xl font-bold">{filteredStudents.length}</p>
                 <p className="text-sm text-muted-foreground">Total Students</p>
               </div>
             </CardContent>
@@ -132,7 +121,7 @@ export default function CourseStudentsPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-3xl font-bold">
-                  {students.filter(s => {
+                  {filteredStudents.filter(s => {
                     const percentage = (s.attendance / s.totalClasses) * 100;
                     return percentage >= 75;
                   }).length}
@@ -146,7 +135,7 @@ export default function CourseStudentsPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-3xl font-bold">
-                  {(students.reduce((sum, s) => sum + parseFloat(getTotalScore(s.assignmentScore, s.quizScore, s.midtermScore)), 0) / students.length).toFixed(1)}
+                  {filteredStudents.length > 0 ? (filteredStudents.reduce((sum, s) => sum + parseFloat(getTotalScore(s.assignmentScore, s.quizScore, s.midtermScore)), 0) / filteredStudents.length).toFixed(1) : '0'}
                 </p>
                 <p className="text-sm text-muted-foreground">Average Score</p>
               </div>
@@ -157,7 +146,7 @@ export default function CourseStudentsPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-3xl font-bold">
-                  {students.filter(s => parseFloat(getTotalScore(s.assignmentScore, s.quizScore, s.midtermScore)) >= 70).length}
+                  {filteredStudents.filter(s => parseFloat(getTotalScore(s.assignmentScore, s.quizScore, s.midtermScore)) >= 70).length}
                 </p>
                 <p className="text-sm text-muted-foreground">Passed</p>
               </div>

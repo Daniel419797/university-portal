@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { User, UserRole } from "@/lib/types";
+import { authService, LoginRequest, RegisterRequest } from "@/lib/services/authService";
+import { toast } from "sonner";
 
 interface AuthState {
   user: User | null;
@@ -17,8 +19,10 @@ interface RegisterData {
   password: string;
   firstName: string;
   lastName: string;
+  role?: string;
   studentId?: string;
   department?: string;
+  staffId?: string;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -31,47 +35,66 @@ export const useAuthStore = create<AuthState>()(
       login: async (email: string, password: string, role: string) => {
         set({ isLoading: true });
         
-        // Simulate API call with mock data
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Mock user based on role
-        const mockUser: User = {
-          id: "1",
-          email,
-          firstName: "John",
-          lastName: "Doe",
-          role: role as UserRole,
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-          studentId: role === "student" ? "STU/2023/001" : undefined,
-          department: "Computer Science",
-          level: role === "student" ? "400" : undefined,
-        };
-
-        set({ user: mockUser, isAuthenticated: true, isLoading: false });
+        try {
+          const credentials: LoginRequest = { email, password };
+          const response = await authService.login(credentials);
+          
+          // Set user and authenticated state
+          set({ 
+            user: response.user, 
+            isAuthenticated: true, 
+            isLoading: false 
+          });
+          
+          toast.success("Login successful!");
+        } catch (error: unknown) {
+          set({ isLoading: false });
+          const errorMessage = error && typeof error === 'object' && 'error' in error 
+            ? (error as { error: { message: string } }).error.message 
+            : "Login failed. Please check your credentials.";
+          toast.error(errorMessage);
+          throw error;
+        }
       },
 
       register: async (data: RegisterData) => {
         set({ isLoading: true });
         
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        const mockUser: User = {
-          id: "1",
-          email: data.email,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          role: "student",
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.email}`,
-          studentId: data.studentId,
-          department: data.department,
-        };
-
-        set({ user: mockUser, isAuthenticated: true, isLoading: false });
+        try {
+          const registerData: RegisterRequest = {
+            email: data.email,
+            password: data.password,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role || "student",
+            department: data.department,
+            level: data.role === 'student' ? undefined : undefined, // Only students have levels
+            matricNumber: data.role === 'student' ? data.studentId : undefined,
+          };
+          
+          const response = await authService.register(registerData);
+          
+          set({ 
+            user: response.user, 
+            isAuthenticated: true, 
+            isLoading: false 
+          });
+          
+          toast.success("Registration successful!");
+        } catch (error: unknown) {
+          set({ isLoading: false });
+          const errorMessage = error && typeof error === 'object' && 'error' in error 
+            ? (error as { error: { message: string } }).error.message 
+            : "Registration failed. Please try again.";
+          toast.error(errorMessage);
+          throw error;
+        }
       },
 
       logout: () => {
+        authService.logout();
         set({ user: null, isAuthenticated: false });
+        toast.info("Logged out successfully");
       },
 
       setUser: (user: User | null) => {

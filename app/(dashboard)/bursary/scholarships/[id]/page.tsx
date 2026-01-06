@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,15 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, Award, CheckCircle, XCircle, FileText, Download
 } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { bursaryService } from "@/lib/services/hodBursaryService";
+import { ScholarshipDetails } from "@/lib/services/hodBursaryService";
 
 export default function BursaryScholarshipReviewPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const scholarshipId = params.id as string;
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [approvalAmount, setApprovalAmount] = useState("");
@@ -26,41 +30,40 @@ export default function BursaryScholarshipReviewPage() {
   const [approvalNotes, setApprovalNotes] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
 
-  // Mock scholarship application data
-  const application = {
-    id: params.id,
-    studentName: "Sarah Williams",
-    matricNumber: "CS/2021/004",
-    email: "sarah.williams@university.edu",
-    phone: "+234 803 456 7890",
-    level: "400 Level",
-    department: "Computer Science",
-    cgpa: 4.95,
-    scholarshipType: "Academic Excellence",
-    requestedAmount: "₦500,000",
-    academicYear: "2025/2026",
-    status: "pending",
-    appliedDate: "2025-12-15",
-    reason: "I am applying for this scholarship to support my final year research project on Artificial Intelligence and Machine Learning. My research aims to develop innovative solutions for healthcare diagnostics. The funding will be used for computational resources, research materials, and conference attendance.",
-    achievements: [
-      "Best Student Award 2023",
-      "Dean's List (2021-2024)",
-      "1st Place - National Programming Competition",
-      "Research Paper Published in IEEE Conference"
-    ],
-    financialNeed: "High",
-    previousScholarships: "None",
-    parentIncome: "₦200,000/month",
-    siblings: "3",
-    guardianOccupation: "Teacher",
-  };
+  const { data: application, isLoading, execute } = useApi<ScholarshipDetails>();
 
-  const documents = [
-    { name: "Academic Transcript", status: "verified", uploadedDate: "2025-12-14" },
-    { name: "Recommendation Letter", status: "verified", uploadedDate: "2025-12-14" },
-    { name: "Financial Statement", status: "verified", uploadedDate: "2025-12-14" },
-    { name: "Research Proposal", status: "verified", uploadedDate: "2025-12-15" },
-  ];
+  useEffect(() => {
+    if (scholarshipId) {
+      execute(() => bursaryService.getScholarshipDetails(scholarshipId), {
+        errorMessage: "Failed to load scholarship application"
+      });
+    }
+  }, [execute, scholarshipId]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading scholarship application...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!application) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-muted-foreground">Scholarship application not found</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const documents = application.documents || [];
 
   const handleApprove = () => {
     if (!approvalAmount || !approvalDuration) {
@@ -74,7 +77,7 @@ export default function BursaryScholarshipReviewPage() {
 
     toast({
       title: "Scholarship Approved",
-      description: `${application.studentName}'s scholarship application has been approved for ${approvalAmount}.`,
+      description: `${application.studentInfo.name}'s scholarship application has been approved for ${approvalAmount}.`,
     });
 
     setTimeout(() => {
@@ -130,7 +133,7 @@ export default function BursaryScholarshipReviewPage() {
             </div>
           </div>
           <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-            {application.status}
+            {application.applicationInfo.status}
           </Badge>
         </div>
 
@@ -144,44 +147,44 @@ export default function BursaryScholarshipReviewPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-center pb-4 border-b">
                   <div className="h-20 w-20 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-2xl font-bold">
-                    {application.studentName.split(" ").map(n => n[0]).join("")}
+                    {application.studentInfo.name.split(" ").map(n => n[0]).join("")}
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium">{application.studentName}</p>
+                    <p className="font-medium">{application.studentInfo.name}</p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">Matric Number</p>
-                    <p className="font-mono">{application.matricNumber}</p>
+                    <p className="font-mono">{application.studentInfo.matricNumber}</p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="text-sm">{application.email}</p>
+                    <p className="text-sm">{application.studentInfo.email}</p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">Phone</p>
-                    <p className="text-sm">{application.phone}</p>
+                    <p className="text-sm">{application.studentInfo.phone}</p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">Level</p>
-                    <p className="font-medium">{application.level}</p>
+                    <p className="font-medium">{application.studentInfo.level}</p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">Department</p>
-                    <p className="font-medium">{application.department}</p>
+                    <p className="font-medium">{application.studentInfo.department}</p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">CGPA</p>
-                    <p className="text-2xl font-bold text-green-600">{application.cgpa}</p>
+                    <p className="text-2xl font-bold text-green-600">{application.academicInfo.cgpa}</p>
                   </div>
                 </div>
               </CardContent>
@@ -194,27 +197,27 @@ export default function BursaryScholarshipReviewPage() {
               <CardContent className="space-y-3">
                 <div>
                   <p className="text-sm text-muted-foreground">Financial Need</p>
-                  <Badge variant="destructive">{application.financialNeed}</Badge>
+                  <Badge variant="destructive">{application.financialInfo.financialNeed}</Badge>
                 </div>
 
                 <div>
                   <p className="text-sm text-muted-foreground">Parent/Guardian Income</p>
-                  <p className="font-medium">{application.parentIncome}</p>
+                  <p className="font-medium">{application.financialInfo.parentIncome}</p>
                 </div>
 
                 <div>
                   <p className="text-sm text-muted-foreground">Guardian Occupation</p>
-                  <p className="font-medium">{application.guardianOccupation}</p>
+                  <p className="font-medium">{application.financialInfo.guardianOccupation}</p>
                 </div>
 
                 <div>
                   <p className="text-sm text-muted-foreground">Number of Siblings</p>
-                  <p className="font-medium">{application.siblings}</p>
+                  <p className="font-medium">{application.financialInfo.siblings}</p>
                 </div>
 
                 <div>
                   <p className="text-sm text-muted-foreground">Previous Scholarships</p>
-                  <p className="font-medium">{application.previousScholarships}</p>
+                  <p className="font-medium">{application.financialInfo.previousScholarships.length}</p>
                 </div>
               </CardContent>
             </Card>
@@ -241,12 +244,12 @@ export default function BursaryScholarshipReviewPage() {
 
                   <div>
                     <p className="text-sm text-muted-foreground">Academic Year</p>
-                    <p className="font-medium">{application.academicYear}</p>
+                    <p className="font-medium">{application.academicInfo.academicYear}</p>
                   </div>
 
                   <div>
                     <p className="text-sm text-muted-foreground">Application Date</p>
-                    <p className="font-medium">{new Date(application.appliedDate).toLocaleDateString()}</p>
+                    <p className="font-medium">{new Date(application.applicationInfo.appliedAt).toLocaleDateString()}</p>
                   </div>
                 </div>
               </CardContent>
@@ -259,7 +262,7 @@ export default function BursaryScholarshipReviewPage() {
                 <CardDescription>Reason for scholarship request</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm leading-relaxed">{application.reason}</p>
+                <p className="text-sm leading-relaxed">{application.applicationInfo.reason}</p>
               </CardContent>
             </Card>
 
@@ -270,10 +273,10 @@ export default function BursaryScholarshipReviewPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {application.achievements.map((achievement, index) => (
+                  {application.academicInfo.achievements.map((achievement, index) => (
                     <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
                       <Award className="h-5 w-5 text-yellow-500" />
-                      <p className="font-medium">{achievement}</p>
+                      <p className="font-medium">{achievement.title}</p>
                     </div>
                   ))}
                 </div>
@@ -294,7 +297,7 @@ export default function BursaryScholarshipReviewPage() {
                         <div>
                           <p className="font-medium">{doc.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Uploaded: {new Date(doc.uploadedDate).toLocaleDateString()}
+                            Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -311,7 +314,7 @@ export default function BursaryScholarshipReviewPage() {
             </Card>
 
             {/* Action Buttons */}
-            {application.status === "pending" && (
+            {application.applicationInfo.status === "pending" && (
               <Card>
                 <CardHeader>
                   <CardTitle>Review Actions</CardTitle>
@@ -349,7 +352,7 @@ export default function BursaryScholarshipReviewPage() {
             <DialogHeader>
               <DialogTitle>Approve Scholarship</DialogTitle>
               <DialogDescription>
-                Provide approval details for {application.studentName}
+                Provide approval details for {application.studentInfo.name}
               </DialogDescription>
             </DialogHeader>
 

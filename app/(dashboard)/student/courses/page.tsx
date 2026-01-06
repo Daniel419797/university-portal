@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,17 +8,57 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { BookOpen, Users, Clock, MapPin, Search } from "lucide-react";
 import Link from "next/link";
-import { mockCourses } from "@/lib/mock-data";
-import { useState } from "react";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services";
+import { Course } from "@/lib/types";
 
 export default function StudentCoursesPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const { data: coursesData, isLoading, execute } = useApi<{ data: Course[]; pagination: any }>();
+
+  useEffect(() => {
+    execute(() => studentService.getCourses(), {
+      errorMessage: "Failed to load courses",
+    });
+  }, [execute]);
+
+  const courses = coursesData?.data || [];
   
-  const filteredCourses = mockCourses.filter(
+  const filteredCourses = courses.filter(
     (course) =>
       course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       course.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">My Courses</h1>
+            <p className="text-muted-foreground">Loading your courses...</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <div className="h-6 bg-muted animate-pulse rounded" />
+                  <div className="h-4 bg-muted animate-pulse rounded mt-2" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="h-12 bg-muted animate-pulse rounded" />
+                    <div className="h-4 bg-muted animate-pulse rounded" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -27,7 +68,7 @@ export default function StudentCoursesPage() {
           <div>
             <h1 className="text-3xl font-bold">My Courses</h1>
             <p className="text-muted-foreground">
-              You are enrolled in {mockCourses.length} courses this semester
+              You are enrolled in {courses.length} courses this semester
             </p>
           </div>
           <Button asChild>
@@ -48,7 +89,17 @@ export default function StudentCoursesPage() {
 
         {/* Courses Grid */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredCourses.map((course) => (
+          {filteredCourses.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <p className="text-muted-foreground">
+                {searchTerm ? "No courses found matching your search" : "No courses enrolled yet"}
+              </p>
+              <Button asChild className="mt-4">
+                <Link href="/student/enrollment">Enroll in Courses</Link>
+              </Button>
+            </div>
+          ) : (
+            filteredCourses.map((course) => (
             <Link key={course.id} href={`/student/courses/${course.id}`}>
               <Card className="h-full transition-shadow hover:shadow-lg">
                 <CardHeader>
@@ -111,23 +162,9 @@ export default function StudentCoursesPage() {
                 </CardContent>
               </Card>
             </Link>
-          ))}
+          ))
+          )}
         </div>
-
-        {filteredCourses.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No courses found</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Try adjusting your search or browse available courses
-              </p>
-              <Button asChild>
-                <Link href="/student/enrollment">Browse Courses</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </DashboardLayout>
   );

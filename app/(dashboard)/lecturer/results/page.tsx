@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,35 +9,31 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Send } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService } from "@/lib/services/lecturerService";
+import { Result, Course } from "@/lib/types";
 
 export default function LecturerResultsPage() {
-  const courses = [
-    { id: "1", code: "CSC 401", name: "Data Structures" },
-    { id: "2", code: "CSC 301", name: "Database Systems" },
-  ];
+  const [selectedCourse, setSelectedCourse] = useState("");
+  
+  const { data: results, isLoading, execute } = useApi<Result[]>();
+  const { data: courses, execute: executeCourses } = useApi<Course[]>();
 
-  const results = [
-    {
-      id: "1",
-      studentName: "John Doe",
-      matricNumber: "STU/2023/001",
-      ca: 18,
-      exam: 65,
-      total: 83,
-      grade: "A",
-      status: "draft",
-    },
-    {
-      id: "2",
-      studentName: "Jane Smith",
-      matricNumber: "STU/2023/002",
-      ca: 20,
-      exam: 68,
-      total: 88,
-      grade: "A",
-      status: "draft",
-    },
-  ];
+  useEffect(() => {
+    executeCourses(() => lecturerService.getCourses(), {
+      errorMessage: "Failed to load courses"
+    });
+  }, [executeCourses]);
+
+  useEffect(() => {
+    if (selectedCourse) {
+      execute(() => lecturerService.getResults(selectedCourse), {
+        errorMessage: "Failed to load results"
+      });
+    }
+  }, [execute, selectedCourse]);
+
+  const coursesList = courses || [];
 
   return (
     <DashboardLayout>
@@ -51,11 +48,11 @@ export default function LecturerResultsPage() {
           <CardContent className="pt-6">
             <div className="flex gap-4">
               <div className="flex-1">
-                <Select>
+                <Select value={selectedCourse} onChange={(e: any) => setSelectedCourse(e.target.value)}>
                   <option value="">Select Course</option>
-                  {courses.map((course) => (
+                  {coursesList.map((course) => (
                     <option key={course.id} value={course.id}>
-                      {course.code} - {course.name}
+                      {course.code} - {course.title}
                     </option>
                   ))}
                 </Select>
@@ -69,7 +66,29 @@ export default function LecturerResultsPage() {
         </Card>
 
         {/* Results Table */}
-        <Card>
+        {isLoading ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading results...</p>
+            </CardContent>
+          </Card>
+        ) : !selectedCourse ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Select a course to view results</p>
+            </CardContent>
+          </Card>
+        ) : !results || results.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No results available for this course</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -131,6 +150,7 @@ export default function LecturerResultsPage() {
             </Table>
           </CardContent>
         </Card>
+        )}
       </div>
     </DashboardLayout>
   );

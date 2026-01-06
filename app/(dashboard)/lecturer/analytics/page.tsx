@@ -1,36 +1,75 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, TrendingUp, Users, FileText } from "lucide-react";
+import { useApi } from "@/hooks/use-api";
+import { lecturerService, LecturerAnalytics } from "@/lib/services/lecturerService";
 
 export default function LecturerAnalyticsPage() {
+  const { data: analytics, isLoading, execute } = useApi<LecturerAnalytics>();
+
+  useEffect(() => {
+    execute(() => lecturerService.getAnalytics(), {
+      errorMessage: "Failed to load analytics"
+    });
+  }, [execute]);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-muted-foreground">Loading analytics...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-muted-foreground">Analytics data not available</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const stats = [
     {
       title: "Total Students",
-      value: "155",
-      change: "+12%",
+      value: analytics?.studentPerformance?.totalStudents !== undefined ? analytics.studentPerformance.totalStudents.toString() : "-",
+      change:
+        analytics?.studentPerformance?.averageGPA !== undefined
+          ? `GPA: ${analytics.studentPerformance.averageGPA.toFixed(2)}`
+          : "GPA: -",
       trend: "up",
       icon: Users,
     },
     {
-      title: "Average Performance",
-      value: "72.5%",
-      change: "+5.2%",
+      title: "Top Performers",
+      value: analytics?.studentPerformance?.topPerformers !== undefined ? analytics.studentPerformance.topPerformers.toString() : "-",
+      change: "Excellent standing",
       trend: "up",
       icon: TrendingUp,
     },
     {
-      title: "Assignments Submitted",
-      value: "89%",
-      change: "-3%",
-      trend: "down",
+      title: "Assignments",
+      value: analytics?.assignmentStats?.totalAssignments !== undefined ? analytics.assignmentStats.totalAssignments.toString() : "-",
+      change: analytics?.assignmentStats?.pendingGrading !== undefined ? `${analytics.assignmentStats.pendingGrading} pending` : "-",
+      trend: "up",
       icon: FileText,
     },
     {
-      title: "Course Rating",
-      value: "4.5/5",
-      change: "+0.3",
+      title: "Avg Assignment Score",
+      value: analytics?.assignmentStats?.averageScore !== undefined ? `${analytics.assignmentStats.averageScore.toFixed(1)}%` : "-",
+      change: analytics?.assignmentStats?.onTimeSubmissions !== undefined ? `${analytics.assignmentStats.onTimeSubmissions}% on time` : "-",
       trend: "up",
       icon: BarChart3,
     },
@@ -77,17 +116,25 @@ export default function LecturerAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {["CSC 401", "CSC 301", "CSC 201"].map((course) => (
-                <div key={course} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">{course}</span>
-                    <span className="text-muted-foreground">75%</span>
+              {Array.isArray(analytics?.coursesOverview) && analytics.coursesOverview.length > 0 ? (
+                analytics.coursesOverview.map((course) => (
+                  <div key={course.courseCode} className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">{course.courseCode} - {course.courseTitle}</span>
+                      <span className="text-muted-foreground">{course.averageScore.toFixed(1)}% avg</span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div className="bg-primary h-2 rounded-full" style={{ width: `${course.averageScore}%` }} />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{course.totalStudents} students</span>
+                      <span>{course.passRate.toFixed(1)}% pass rate</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full" style={{ width: "75%" }} />
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="text-muted-foreground text-center">No course performance data available.</div>
+              )}
             </div>
           </CardContent>
         </Card>

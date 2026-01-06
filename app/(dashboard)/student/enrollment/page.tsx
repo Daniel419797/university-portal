@@ -6,113 +6,46 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, BookOpen, Users, Clock, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useApi } from "@/hooks/use-api";
+import { studentService } from "@/lib/services";
+import type { Course } from "@/lib/types";
 
 export default function EnrollmentPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const { toast } = useToast();
 
-  const availableCourses = [
-    {
-      code: "CSC 401",
-      title: "Artificial Intelligence",
-      units: 3,
-      lecturer: "Dr. Michael Chen",
-      schedule: "Mon, Wed 10:00 AM",
-      capacity: 50,
-      enrolled: 42,
-      prerequisite: "CSC 301",
-      description: "Introduction to AI concepts, machine learning, and neural networks",
-    },
-    {
-      code: "CSC 403",
-      title: "Compiler Construction",
-      units: 3,
-      lecturer: "Prof. Sarah Johnson",
-      schedule: "Tue, Thu 2:00 PM",
-      capacity: 45,
-      enrolled: 38,
-      prerequisite: "CSC 303",
-      description: "Design and implementation of compilers, lexical and syntax analysis",
-    },
-    {
-      code: "CSC 405",
-      title: "Computer Graphics",
-      units: 3,
-      lecturer: "Dr. David Williams",
-      schedule: "Mon, Wed 2:00 PM",
-      capacity: 40,
-      enrolled: 35,
-      prerequisite: "MTH 201",
-      description: "3D graphics, transformations, rendering techniques",
-    },
-    {
-      code: "CSC 407",
-      title: "Software Project Management",
-      units: 2,
-      lecturer: "Mrs. Emily Davis",
-      schedule: "Fri 10:00 AM",
-      capacity: 60,
-      enrolled: 55,
-      prerequisite: "CSC 305",
-      description: "Project planning, risk management, Agile methodologies",
-    },
-    {
-      code: "CSC 409",
-      title: "Cloud Computing",
-      units: 3,
-      lecturer: "Dr. James Wilson",
-      schedule: "Tue, Thu 10:00 AM",
-      capacity: 50,
-      enrolled: 48,
-      prerequisite: "CSC 307",
-      description: "Cloud architecture, AWS, Azure, containerization",
-    },
-    {
-      code: "CSC 411",
-      title: "Cybersecurity",
-      units: 3,
-      lecturer: "Prof. Linda Brown",
-      schedule: "Mon, Wed 12:00 PM",
-      capacity: 45,
-      enrolled: 40,
-      prerequisite: "CSC 307",
-      description: "Network security, cryptography, ethical hacking",
-    },
-  ];
+  const { data: availableCourses, isLoading: loadingAvailable, execute: loadAvailableCourses } = useApi<Course[]>();
+  const { data: enrolledCourses, isLoading: loadingEnrolled, execute: loadEnrolledCourses } = useApi<{ data: Course[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>();
+  const { isLoading: enrolling, execute: enroll } = useApi();
 
-  const currentEnrollment = [
-    {
-      code: "CSC 401",
-      title: "Artificial Intelligence",
-      units: 3,
-      status: "confirmed",
-    },
-    {
-      code: "CSC 403",
-      title: "Compiler Construction",
-      units: 3,
-      status: "confirmed",
-    },
-  ];
+  useEffect(() => {
+    loadAvailableCourses(() => studentService.getAvailableCourses(), {
+      errorMessage: "Failed to load available courses",
+    });
+    loadEnrolledCourses(() => studentService.getCourses(), {
+      errorMessage: "Failed to load enrolled courses",
+    });
+  }, [loadAvailableCourses, loadEnrolledCourses]);
 
-  const filteredCourses = availableCourses.filter(
-    (course) =>
-      course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAvailableCourses = availableCourses?.filter(course =>
+    course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    course.code.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
 
-  const toggleCourseSelection = (courseCode: string) => {
+  const currentEnrollment = enrolledCourses?.data || [];
+
+  const toggleCourseSelection = (courseId: string) => {
     setSelectedCourses((prev) =>
-      prev.includes(courseCode)
-        ? prev.filter((code) => code !== courseCode)
-        : [...prev, courseCode]
+      prev.includes(courseId)
+        ? prev.filter((id) => id !== courseId)
+        : [...prev, courseId]
     );
   };
 
-  const handleEnrollment = () => {
+  const handleEnrollment = async () => {
     if (selectedCourses.length === 0) {
       toast({
         title: "No Courses Selected",
@@ -122,19 +55,23 @@ export default function EnrollmentPage() {
       return;
     }
 
-    toast({
-      title: "Enrollment Successful",
-      description: `You have been enrolled in ${selectedCourses.length} course(s).`,
-      variant: "success",
+    await enroll(() => studentService.enrollCourses({ courseIds: selectedCourses }), {
+      successMessage: `Successfully enrolled in ${selectedCourses.length} course(s)`,
+      errorMessage: "Failed to enroll in courses",
+      onSuccess: () => {
+        setSelectedCourses([]);
+        // Refresh enrolled courses
+        loadEnrolledCourses(() => studentService.getCourses(), {
+          errorMessage: "Failed to refresh enrolled courses",
+        });
+      },
     });
-
-    setSelectedCourses([]);
   };
 
-  const totalUnits = currentEnrollment.reduce((sum, course) => sum + course.units, 0);
-  const selectedUnits = selectedCourses.reduce((sum, code) => {
-    const course = availableCourses.find((c) => c.code === code);
-    return sum + (course?.units || 0);
+  const totalUnits = currentEnrollment.reduce((sum: number, course: Course) => sum + (course.credits || 0), 0);
+  const selectedUnits = selectedCourses.reduce((sum, id) => {
+    const course = availableCourses?.find((c) => c.id === id);
+    return sum + (course?.credits || 0);
   }, 0);
 
   return (
@@ -152,7 +89,7 @@ export default function EnrollmentPage() {
             <p className="font-medium mb-1">Enrollment Period Active</p>
             <p>
               Course registration is open until January 31, 2026. Late enrollment fee of ₦5,000
-              applies after this date. Minimum: 12 units, Maximum: 24 units per semester.
+              applies after this date. Minimum: 12 credits, Maximum: 24 credits per semester.
             </p>
           </div>
         </div>
@@ -172,7 +109,7 @@ export default function EnrollmentPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardDescription>Total Units</CardDescription>
+              <CardDescription>Total Credits</CardDescription>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -218,19 +155,28 @@ export default function EnrollmentPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {currentEnrollment.map((course) => (
-                <div key={course.code} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">
-                      {course.code} - {course.title}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{course.units} Units</p>
-                  </div>
-                  <Badge className="bg-green-500">
-                    {course.status}
-                  </Badge>
+              {loadingEnrolled ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-sm text-muted-foreground mt-2">Loading enrolled courses...</p>
                 </div>
-              ))}
+              ) : currentEnrollment.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No courses enrolled yet</p>
+              ) : (
+                currentEnrollment.map((course: Course) => (
+                  <div key={course.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">
+                        {course.code} - {course.title}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{course.credits} Credits</p>
+                    </div>
+                    <Badge className="bg-green-500">
+                      Enrolled
+                    </Badge>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -256,75 +202,82 @@ export default function EnrollmentPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredCourses.map((course) => {
-                const isSelected = selectedCourses.includes(course.code);
-                const availableSpots = course.capacity - course.enrolled;
-                const isAlmostFull = availableSpots <= 5;
+              {loadingAvailable ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-sm text-muted-foreground mt-4">Loading available courses...</p>
+                </div>
+              ) : filteredAvailableCourses.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  {searchQuery ? "No courses match your search" : "No courses available for enrollment"}
+                </p>
+              ) : (
+                filteredAvailableCourses.map((course) => {
+                  const isSelected = selectedCourses.includes(course.id);
+                  const availableSpots = (course.capacity || 0) - (course.enrolled || 0);
+                  const isAlmostFull = availableSpots <= 5;
+                  const scheduleText = course.schedule?.map((s: { day: string; startTime: string; endTime: string }) => `${s.day} ${s.startTime}-${s.endTime}`).join(", ") || "TBA";
 
-                return (
-                  <div
-                    key={course.code}
-                    className={`border rounded-lg p-4 transition-colors cursor-pointer ${
-                      isSelected ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
-                    }`}
-                    onClick={() => toggleCourseSelection(course.code)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-lg">
-                            {course.code} - {course.title}
-                          </h3>
-                          {isAlmostFull && (
-                            <Badge variant="destructive" className="text-xs">
-                              Almost Full
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          {course.description}
-                        </p>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>{course.lecturer}</span>
+                  return (
+                    <div
+                      key={course.id}
+                      className={`border rounded-lg p-4 transition-colors cursor-pointer ${
+                        isSelected ? "border-primary bg-primary/5" : "hover:border-muted-foreground/50"
+                      }`}
+                      onClick={() => toggleCourseSelection(course.id)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold text-lg">
+                              {course.code} - {course.title}
+                            </h3>
+                            {isAlmostFull && (
+                              <Badge variant="destructive" className="text-xs">
+                                Almost Full
+                              </Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span>{course.schedule}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-muted-foreground" />
-                            <span>{course.units} Units</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>
-                              {course.enrolled}/{course.capacity} Enrolled
-                            </span>
-                          </div>
-                        </div>
-                        {course.prerequisite && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Prerequisite: {course.prerequisite}
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {course.description}
                           </p>
-                        )}
-                      </div>
-                      <div className="ml-4">
-                        <Button
-                          variant={isSelected ? "default" : "outline"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleCourseSelection(course.code);
-                          }}
-                        >
-                          {isSelected ? "Selected" : "Select"}
-                        </Button>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <span>{course.lecturer}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <span>{scheduleText}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="h-4 w-4 text-muted-foreground" />
+                              <span>{course.credits} Credits</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <span>
+                                {course.enrolled || 0}/{course.capacity || 0} Enrolled
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <Button
+                            variant={isSelected ? "default" : "outline"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleCourseSelection(course.id);
+                            }}
+                          >
+                            {isSelected ? "Selected" : "Select"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>
@@ -336,17 +289,19 @@ export default function EnrollmentPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold">
-                    {selectedCourses.length} course(s) selected ({selectedUnits} units)
+                    {selectedCourses.length} course(s) selected ({selectedUnits} credits)
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Total after enrollment: {totalUnits + selectedUnits} units
+                    Total after enrollment: {totalUnits + selectedUnits} credits
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setSelectedCourses([])}>
                     Clear Selection
                   </Button>
-                  <Button onClick={handleEnrollment}>Enroll in Selected Courses</Button>
+                  <Button onClick={handleEnrollment} disabled={enrolling}>
+                    {enrolling ? "Enrolling..." : "Enroll in Selected Courses"}
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -359,14 +314,11 @@ export default function EnrollmentPage() {
             <CardTitle>Enrollment Guidelines</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>• Minimum credit load: 12 units per semester</p>
-            <p>• Maximum credit load: 24 units per semester</p>
+            <p>• Minimum credit load: 12 credits per semester</p>
+            <p>• Maximum credit load: 24 credits per semester</p>
             <p>• Ensure you have completed all prerequisite courses</p>
             <p>• Check for schedule conflicts before enrolling</p>
-            <p>
-              • Course changes allowed within the first 2 weeks of the semester (add/drop period)
-            </p>
-            <p>• Contact your academic advisor for guidance on course selection</p>
+            <p>• Late enrollment fee: ₦5,000 after January 31, 2026</p>
           </CardContent>
         </Card>
       </div>

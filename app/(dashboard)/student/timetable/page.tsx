@@ -1,119 +1,23 @@
 "use client";
 
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
-
-interface TimetableEntry {
-  day: string;
-  slots: {
-    time: string;
-    courseCode: string;
-    courseTitle: string;
-    venue: string;
-    lecturer: string;
-    type: "lecture" | "practical" | "tutorial";
-  }[];
-}
+import { useApi } from "@/hooks/use-api";
+import { studentService, type Timetable } from "@/lib/services";
 
 export default function StudentTimetablePage() {
-  const timetable: TimetableEntry[] = [
-    {
-      day: "Monday",
-      slots: [
-        {
-          time: "08:00 - 10:00",
-          courseCode: "CSC 401",
-          courseTitle: "Data Structures",
-          venue: "LT1",
-          lecturer: "Dr. Anderson",
-          type: "lecture",
-        },
-        {
-          time: "14:00 - 16:00",
-          courseCode: "CSC 403",
-          courseTitle: "Software Engineering",
-          venue: "Lab 2",
-          lecturer: "Prof. Thompson",
-          type: "practical",
-        },
-      ],
-    },
-    {
-      day: "Tuesday",
-      slots: [
-        {
-          time: "10:00 - 12:00",
-          courseCode: "CSC 402",
-          courseTitle: "Operating Systems",
-          venue: "LT2",
-          lecturer: "Dr. Martinez",
-          type: "lecture",
-        },
-      ],
-    },
-    {
-      day: "Wednesday",
-      slots: [
-        {
-          time: "08:00 - 10:00",
-          courseCode: "CSC 401",
-          courseTitle: "Data Structures",
-          venue: "Lab 3",
-          lecturer: "Dr. Anderson",
-          type: "practical",
-        },
-        {
-          time: "12:00 - 14:00",
-          courseCode: "CSC 404",
-          courseTitle: "Computer Networks",
-          venue: "LT1",
-          lecturer: "Prof. Garcia",
-          type: "lecture",
-        },
-      ],
-    },
-    {
-      day: "Thursday",
-      slots: [
-        {
-          time: "10:00 - 12:00",
-          courseCode: "CSC 405",
-          courseTitle: "Artificial Intelligence",
-          venue: "LT3",
-          lecturer: "Dr. Rodriguez",
-          type: "lecture",
-        },
-      ],
-    },
-    {
-      day: "Friday",
-      slots: [
-        {
-          time: "14:00 - 16:00",
-          courseCode: "CSC 402",
-          courseTitle: "Operating Systems",
-          venue: "Lab 1",
-          lecturer: "Dr. Martinez",
-          type: "tutorial",
-        },
-      ],
-    },
-  ];
+  const { data, isLoading, execute } = useApi<Timetable>();
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "lecture":
-        return "bg-blue-500";
-      case "practical":
-        return "bg-green-500";
-      case "tutorial":
-        return "bg-purple-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
+  useEffect(() => {
+    execute(() => studentService.getTimetable(), {
+      errorMessage: "Failed to load timetable",
+    });
+  }, [execute]);
+
+  const schedule = data?.schedule || [];
 
   return (
     <DashboardLayout>
@@ -123,20 +27,38 @@ export default function StudentTimetablePage() {
           <p className="text-muted-foreground">Your weekly class schedule</p>
         </div>
 
+        {isLoading && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Loading timetable...</CardTitle>
+              <CardDescription>Please wait while we fetch your classes.</CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+
         <div className="grid gap-4">
-          {timetable.map((day) => (
+          {!isLoading && schedule.length === 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>No classes scheduled</CardTitle>
+                <CardDescription>Once your timetable is published, it will appear here.</CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+
+          {schedule.map((day) => (
             <Card key={day.day}>
               <CardHeader>
                 <CardTitle>{day.day}</CardTitle>
-                <CardDescription>{day.slots.length} classes scheduled</CardDescription>
+                <CardDescription>{day.classes.length} classes scheduled</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {day.slots.map((slot, idx) => (
+                  {day.classes.map((slot, idx) => (
                     <div
                       key={idx}
                       className="flex items-start gap-4 border-l-4 pl-4 py-2"
-                      style={{ borderLeftColor: getTypeColor(slot.type).replace('bg-', '#') }}
+                      style={{ borderLeftColor: "#0ea5e9" }}
                     >
                       <div className="flex-shrink-0">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -147,9 +69,6 @@ export default function StudentTimetablePage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold">{slot.courseCode}</span>
-                          <Badge variant="outline" className="capitalize">
-                            {slot.type}
-                          </Badge>
                         </div>
                         <p className="text-sm">{slot.courseTitle}</p>
                         <p className="text-sm text-muted-foreground">
@@ -158,7 +77,7 @@ export default function StudentTimetablePage() {
                       </div>
                     </div>
                   ))}
-                  {day.slots.length === 0 && (
+                  {day.classes.length === 0 && (
                     <p className="text-sm text-muted-foreground">No classes scheduled</p>
                   )}
                 </div>
